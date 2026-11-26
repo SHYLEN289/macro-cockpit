@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Macro cockpit</title>
+<style>
+:root {
+  color-scheme: light;
+  --page:#f9f9f9; --surf:#ffffff; --ink:#191919; --ink2:#666666;
+  --grid:#e7e7e7; --axis:#c2c2c2; --line:rgba(11,11,11,.10); --wash:rgba(11,11,11,.04);
+  --s1:#257de0; --s2:#f47230; --s3:#00b894;
+  --good:#0aac23; --warn:#fbb315; --serious:#f18a59; --crit:#dc3c3d;
+  --up:#006c10; --down:#b92a2c;
+  --on-warn:#0b0b0b; --on-fill:#ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page:#0b0b0b; --surf:#191919; --ink:#efefef; --ink2:#9c9c9c;
+    --grid:#303030; --axis:#474747; --line:rgba(255,255,255,.10); --wash:rgba(255,255,255,.05);
+    --s1:#338ced; --s2:#e76624; --s3:#00a888;
+    --up:#53c556; --down:#eb6263;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page:#0b0b0b; --surf:#191919; --ink:#efefef; --ink2:#9c9c9c;
+  --grid:#303030; --axis:#474747; --line:rgba(255,255,255,.10); --wash:rgba(255,255,255,.05);
+  --s1:#338ced; --s2:#e76624; --s3:#00a888;
+  --up:#53c556; --down:#eb6263;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--page); color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 56px; }
+h1, h2, h3, p { margin: 0; }
+h2 { font-size: 19px; font-weight: 650; letter-spacing: -.01em; }
+h3 { font-size: 15px; font-weight: 650; }
+.muted { color: var(--ink2); }
+.small { font-size: 13px; }
+.num { font-variant-numeric: tabular-nums; }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; border-radius: 4px; }
+
+/* header */
+.top { display: flex; align-items: baseline; gap: 12px 20px; flex-wrap: wrap; margin-bottom: 16px; }
+.top h1 { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+.top .meta { color: var(--ink2); font-size: 13px; flex: 1; min-width: 200px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--surf); white-space: nowrap; }
+.theme { cursor: pointer; background: var(--surf); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font-size: 13px; }
+.banner { border: 1px solid var(--line); border-left: 4px solid var(--warn); background: var(--surf); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 14px; }
+.banner.err { border-left-color: var(--crit); }
+
+/* cards */
+.card { background: var(--surf); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+.grid { display: grid; gap: 14px; }
+.g2 { grid-template-columns: 1fr 1fr; }
+.g3 { grid-template-columns: repeat(3, 1fr); }
+.hero { display: grid; align-items: stretch; grid-template-columns: 1.35fr 1fr; gap: 14px; margin-bottom: 14px; }
+section.block { margin-top: 34px; }
+.sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.sec-sub { color: var(--ink2); font-size: 13.5px; margin-bottom: 14px; max-width: 70ch; }
+.cardhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+
+/* posture */
+.posture { padding: 22px 22px 20px; }
+.dial { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin-bottom: 18px; }
+.seg { height: 30px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 600; opacity: .28; position: relative; }
+.seg.on { opacity: 1; }
+.seg.normal { background: var(--good); color: var(--on-fill); }
+.seg.elevated { background: var(--warn); color: var(--on-warn); }
+.seg.critical { background: var(--crit); color: var(--on-fill); }
+.seg.on::after { content: ""; position: absolute; bottom: -9px; left: 50%; margin-left: -6px; border: 6px solid transparent; border-top: 0; border-bottom: 7px solid var(--ink); }
+.pword { font-size: clamp(44px, 8vw, 68px); line-height: 1; font-weight: 700; letter-spacing: -.035em; margin: 10px 0 10px; }
+.pguide { font-size: 16px; max-width: 52ch; margin-bottom: 14px; }
+.reasons { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 14px; color: var(--ink2); }
+.reasons li { padding-left: 16px; position: relative; }
+.reasons li::before { content: ""; position: absolute; left: 2px; top: .62em; width: 6px; height: 6px; border-radius: 50%; background: var(--ink2); }
+
+/* regime */
+.rlabel { font-size: 17px; font-weight: 650; }
+.rrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
+.radar { width: 100%; max-width: 480px; display: block; margin: 4px auto 0; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink2); margin-top: 6px; }
+.lg { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 18px; height: 0; border-top: 2px solid; display: inline-block; }
+
+/* lists */
+.rows { display: grid; }
+.row { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
+.row:first-child { border-top: 0; }
+.row .val { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+.row .why { font-size: 12.5px; color: var(--ink2); }
+.tag { font-size: 11.5px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--axis); color: var(--ink2); margin-left: 6px; white-space: nowrap; }
+.state { font-size: 12px; color: var(--ink2); }
+.ic { width: 16px; height: 16px; flex: none; }
+
+/* tiles */
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.tile { background: var(--surf); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.tile .tv { font-size: 24px; font-weight: 650; letter-spacing: -.02em; line-height: 1.15; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.d { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.d.up { color: var(--up); } .d.down { color: var(--down); } .d.flat { color: var(--ink2); }
+
+/* instruments */
+.inst .price { font-size: 30px; font-weight: 700; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+.inst .top2 { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.lens { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 8px; }
+.lens .chip { font-size: 12.5px; }
+.warn { border-left: 3px solid var(--warn); padding: 4px 10px; margin-top: 8px; font-size: 13.5px; background: var(--wash); border-radius: 0 6px 6px 0; }
+
+/* charts */
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+.tip { position: absolute; pointer-events: none; background: var(--surf); border: 1px solid var(--line); box-shadow: 0 2px 10px rgba(0,0,0,.18); border-radius: 8px; padding: 7px 10px; font-size: 12.5px; z-index: 5; white-space: nowrap; display: none; }
+.tip b { font-weight: 650; }
+.tip .tl { display: flex; align-items: center; gap: 6px; }
+svg text { font-family: inherit; fill: var(--ink2); font-size: 11.5px; }
+svg text.ink { fill: var(--ink); }
+svg .halo { paint-order: stroke; stroke: var(--surf); stroke-width: 3px; stroke-linejoin: round; }
+details.tbl { margin-top: 8px; font-size: 13px; }
+details.tbl summary { cursor: pointer; color: var(--ink2); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: right; padding: 5px 8px; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 600; color: var(--ink2); border-top: 0; }
+.scroll { overflow-x: auto; }
+
+/* thermometer / bars */
+.thermo { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; margin: 14px 0 6px; position: relative; }
+.thermo .b { height: 30px; border-radius: 4px; font-size: 12px; display: flex; align-items: center; justify-content: center; background: var(--wash); border: 1px solid var(--line); text-align: center; line-height: 1.1; }
+.thermo .b.on { background: var(--ink); color: var(--surf); border-color: var(--ink); font-weight: 650; }
+.thermo-scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; font-size: 11.5px; color: var(--ink2); text-align: center; }
+.cone { position: relative; height: 34px; margin: 18px 0 6px; }
+.cone .track { position: absolute; left: 0; right: 0; top: 14px; height: 8px; background: var(--wash); border-radius: 4px; border: 1px solid var(--line); }
+.cone .rng { position: absolute; top: 14px; height: 8px; background: var(--s1); opacity: .35; border-radius: 4px; }
+.cone .mk { position: absolute; top: 9px; width: 4px; height: 18px; background: var(--ink); border-radius: 2px; margin-left: -2px; }
+.cone .lb { position: absolute; top: -4px; font-size: 11.5px; color: var(--ink2); transform: translateX(-50%); white-space: nowrap; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 14px; }
+.kv dt { color: var(--ink2); } .kv dd { margin: 0; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.phase { font-size: 30px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.corridor { position: relative; height: 54px; margin: 8px 0 2px; }
+.corridor .band { position: absolute; top: 24px; height: 10px; background: var(--wash); border: 1px solid var(--axis); border-radius: 4px; }
+.corridor .pt { position: absolute; top: 18px; width: 2px; height: 22px; background: var(--ink); margin-left: -1px; }
+.corridor .pt span { position: absolute; font-size: 11.5px; color: var(--ink2); white-space: nowrap; transform: translateX(-50%); }
+.corridor .pt.hi span { top: -15px; } .corridor .pt.lo span { top: 25px; }
+.spk-row { display: grid; grid-template-columns: 1fr auto 90px; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.spk-row:first-child { border-top: 0; }
+.pb { display: grid; gap: 4px; margin-top: 8px; font-size: 13.5px; }
+.pb div { display: flex; gap: 8px; }
+.pb b { min-width: 42px; }
+footer { margin-top: 40px; color: var(--ink2); font-size: 13px; display: grid; gap: 8px; }
+footer details { background: var(--surf); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+footer summary { cursor: pointer; }
+
+@media (max-width: 900px) {
+  .hero, .g2, .g3 { grid-template-columns: 1fr; }
+  .tiles { grid-template-columns: repeat(2, 1fr); }
+  .posture { padding: 18px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .seg { transition: opacity .2s; }
+}
+@media (forced-colors: active) {
+  .seg.on, .thermo .b.on { outline: 2px solid CanvasText; }
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app" aria-live="polite">
+  <p class="muted">Loading data…</p>
+</div>
+
+<script>
+"use strict";
+/* ---------- helpers ---------- */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const nf = (v, d = 2) => v == null ? "n/a" : Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const sg = (v, d = 2) => v == null ? "n/a" : (v > 0 ? "+" : v < 0 ? "−" : "") + nf(Math.abs(v), d);
+const cls = v => v == null || v === 0 ? "flat" : v > 0 ? "up" : "down";
+const arrow = v => v == null || v === 0 ? "" : v > 0 ? "▲ " : "▼ ";
+const cv = n => `var(--${n})`;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue("--" + n).trim();
+
+const ICON = {
+  ok:      `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="var(--good)"/></svg>`,
+  support: `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="var(--good)"/></svg>`,
+  watch:   `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2 15 14H1z" fill="var(--warn)"/></svg>`,
+  neutral: `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="2.4" rx="1.2" fill="var(--axis)"/></svg>`,
+  alert:   `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1 15 8 8 15 1 8z" fill="var(--serious)"/></svg>`,
+  stress:  `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1 15 8 8 15 1 8z" fill="var(--serious)"/></svg>`,
+  crisis:  `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" fill="var(--crit)"/><path d="M5.5 5.5l5 5m0-5l-5 5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>`,
+  na:      `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5" fill="none" stroke="var(--axis)" stroke-width="1.5"/></svg>`,
+};
+const STATE_LABEL = { ok: "OK", watch: "Watch", alert: "Alert", crisis: "Crisis", na: "No data", support: "Supports", neutral: "Neutral", stress: "Stress" };
+
+function nice(min, max, n = 4) {
+  const span = (max - min) || 1, raw = span / n, p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * p).find(s => s >= raw);
+  const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step, t = [];
+  for (let v = lo; v <= hi + step / 2; v += step) t.push(+v.toFixed(10));
+  return { lo, hi, ticks: t };
+}
+
+function spark(values, { w = 90, h = 26, color = "var(--s1)" } = {}) {
+  const v = (values || []).filter(x => x != null);
+  if (v.length < 2) return "";
+  const min = Math.min(...v), max = Math.max(...v), r = (max - min) || 1;
+  const pts = v.map((y, i) => [2 + i * (w - 4) / (v.length - 1), 2 + (h - 4) * (1 - (y - min) / r)]);
+  const d = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join("");
+  const last = pts[pts.length - 1];
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="Trend, from ${nf(v[0])} to ${nf(v[v.length - 1])}"><path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${last[0]}" cy="${last[1]}" r="3" fill="${color}" stroke="var(--surf)" stroke-width="1.5"/></svg>`;
+}
+
+/* Responsive line chart with crosshair and tooltip. cfg:
+   cats: x labels (array)    series: [{name, values, color, dash, label}]
+   yfmt: fn   height   ref: [{v, label}]   bands: [{from, to}] (shaded)   markers: bool */
+function lineChart(el, cfg) {
+  const draw = () => {
+    const W = Math.max(280, el.clientWidth), H = cfg.height || 240;
+    const m = { l: 46, r: cfg.endLabels ? 74 : 16, t: 12, b: 28 };
+    const all = cfg.series.flatMap(s => s.values.filter(v => v != null)).concat((cfg.ref || []).map(r => r.v));
+    const sc = nice(Math.min(...all), Math.max(...all));
+    const n = cfg.cats.length, iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const X = i => m.l + (n === 1 ? iw / 2 : i * iw / (n - 1)), Y = v => m.t + ih * (1 - (v - sc.lo) / (sc.hi - sc.lo));
+    let g = "";
+    sc.ticks.forEach(t => { g += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--grid)"/><text x="${m.l - 8}" y="${Y(t) + 4}" text-anchor="end">${(cfg.yfmt || (x => nf(x, 0)))(t)}</text>`; });
+    (cfg.bands || []).forEach(b => { g += `<rect x="${m.l}" y="${Y(Math.min(b.to, sc.hi))}" width="${iw}" height="${Math.max(0, Y(Math.max(b.from, sc.lo)) - Y(Math.min(b.to, sc.hi)))}" fill="var(--wash)"/>`; });
+    (cfg.ref || []).forEach(r => { g += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(r.v)}" y2="${Y(r.v)}" stroke="var(--axis)" stroke-dasharray="4 4"/><text class="halo" x="${W - m.r - 4}" y="${Y(r.v) - 5}" text-anchor="end">${esc(r.label)}</text>`; });
+    const step = Math.max(1, Math.ceil(n / (W < 480 ? 4 : 7)));
+    cfg.cats.forEach((c, i) => { if (i % step === 0 || i === n - 1) g += `<text x="${X(i)}" y="${H - 8}" text-anchor="${i === 0 ? "start" : i === n - 1 ? "end" : "middle"}">${esc(cfg.xlab ? cfg.xlab(c) : c)}</text>`; });
+    g += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(sc.lo)}" y2="${Y(sc.lo)}" stroke="var(--axis)"/>`;
+    cfg.series.forEach(s => {
+      const pts = s.values.map((v, i) => v == null ? null : [X(i), Y(v)]).filter(Boolean);
+      if (!pts.length) return;
+      g += `<path d="${pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join("")}" fill="none" stroke="${s.color}" stroke-width="${s.width || 2}" ${s.dash ? `stroke-dasharray="${s.dash}"` : ""} stroke-linejoin="round" stroke-linecap="round"/>`;
+      if (cfg.markers) pts.forEach(p => { g += `<circle cx="${p[0]}" cy="${p[1]}" r="4.5" fill="${s.color}" stroke="var(--surf)" stroke-width="2"/>`; });
+      if (cfg.endLabels && s.label) { const l = pts[pts.length - 1]; g += `<text class="halo ink" x="${l[0] + 8}" y="${l[1] + 4}">${esc(s.label)}</text>`; }
+    });
+    g += `<line id="xh" y1="${m.t}" y2="${m.t + ih}" stroke="var(--ink2)" stroke-dasharray="3 3" style="display:none"/>`;
+    cfg.series.forEach((s, k) => { g += `<circle class="hd" data-k="${k}" r="5" fill="${s.color}" stroke="var(--surf)" stroke-width="2" style="display:none"/>`; });
+    g += `<rect id="hit" x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent"/>`;
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(cfg.aria || "Chart")}">${g}</svg><div class="tip"></div>`;
+    const svg = $("svg", el), tip = $(".tip", el), xh = $("#xh", el), hit = $("#hit", el), hds = [...el.querySelectorAll(".hd")];
+    const show = ev => {
+      const rc = svg.getBoundingClientRect(), px = (ev.clientX - rc.left) * (W / rc.width);
+      const i = Math.max(0, Math.min(n - 1, Math.round((px - m.l) / (iw / Math.max(1, n - 1)))));
+      xh.setAttribute("x1", X(i)); xh.setAttribute("x2", X(i)); xh.style.display = "";
+      hds.forEach((c, k) => { const v = cfg.series[k].values[i]; if (v == null) { c.style.display = "none"; return; } c.setAttribute("cx", X(i)); c.setAttribute("cy", Y(v)); c.style.display = ""; });
+      tip.innerHTML = `<b>${esc(cfg.xlab ? cfg.xlab(cfg.cats[i]) : cfg.cats[i])}</b>` + cfg.series.map(s => `<div class="tl"><span class="sw" style="border-color:${s.color}"></span>${cfg.series.length > 1 ? esc(s.name) + ": " : ""}<b>${s.values[i] == null ? "n/a" : (cfg.tipfmt || cfg.yfmt || nf)(s.values[i])}</b></div>`).join("");
+      tip.style.display = "block";
+      const tw = tip.offsetWidth, x = X(i) * (rc.width / W);
+      tip.style.left = Math.max(0, Math.min(rc.width - tw, x - tw / 2)) + "px"; tip.style.top = "0px";
+    };
+    const hide = () => { tip.style.display = "none"; xh.style.display = "none"; hds.forEach(c => c.style.display = "none"); };
+    hit.addEventListener("pointermove", show); hit.addEventListener("pointerdown", show); hit.addEventListener("pointerleave", hide);
+  };
+  draw();
+  let lastW = el.clientWidth;
+  new ResizeObserver(() => { if (Math.abs(el.clientWidth - lastW) > 2) { lastW = el.clientWidth; draw(); } }).observe(el);
+}
+
+/* ---------- sections ---------- */
+function chipDelta(v, d = 2, unit = "") { return v == null ? "" : `<span class="d ${cls(v)}">${arrow(v)}${nf(Math.abs(v), d)}${unit}</span>`; }
+
+function secHead(title, sub) { return `<div class="sec-head"><h2>${esc(title)}</h2></div><p class="sec-sub">${esc(sub)}</p>`; }
+
+function renderPosture(d) {
+  const p = d.posture, lv = p.level;
+  return `<div class="card posture">
+    <div class="dial" role="img" aria-label="Posture: ${esc(lv)}">${["Normal", "Elevated", "Critical"].map(x => `<div class="seg ${x.toLowerCase()} ${x === lv ? "on" : ""}">${x}</div>`).join("")}</div>
+    <h1 class="pword">${esc(lv)}</h1>
+    <p class="pguide">${esc(p.guidance)}</p>
+    <ul class="reasons">${p.reasons.map(r => `<li>${esc(r)}</li>`).join("")}</ul>
+  </div>`;
+}
+
+function renderRegime(d) {
+  const g = d.regime;
+  if (!g) return `<div class="card"><h3>Macro regime</h3><p class="muted small">Not enough data to score the regime.</p></div>`;
+  const keys = Object.keys(g.dims), n = keys.length, cx = 240, cy = 130, R = 86;
+  const pt = (i, v) => { const a = -Math.PI / 2 + i * 2 * Math.PI / n, r = R * v / 100; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; };
+  const poly = f => keys.map((k, i) => { const v = f(g.dims[k]); return v == null ? null : pt(i, v).map(x => x.toFixed(1)).join(","); }).filter(Boolean).join(" ");
+  const ring = v => keys.map((k, i) => pt(i, v).map(x => x.toFixed(1)).join(",")).join(" ");
+  let s = `<polygon points="${ring(100)}" fill="none" stroke="var(--grid)"/>`;
+  s += `<polygon points="${ring(65)}" fill="none" stroke="var(--axis)" stroke-dasharray="3 3"/><polygon points="${ring(35)}" fill="none" stroke="var(--axis)" stroke-dasharray="3 3"/>`;
+  keys.forEach((k, i) => { const e = pt(i, 100); s += `<line x1="${cx}" y1="${cy}" x2="${e[0]}" y2="${e[1]}" stroke="var(--grid)"/>`; });
+  s += `<text class="halo" x="${cx + 4}" y="${cy - R * .65 - 3}">65 risk-on</text><text class="halo" x="${cx + 4}" y="${cy - R * .35 - 3}">35 risk-off</text>`;
+  if (g.avg_prev != null) s += `<polygon points="${poly(x => x.prev)}" fill="none" stroke="var(--ink2)" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+  s += `<polygon points="${poly(x => x.now)}" fill="var(--s1)" fill-opacity=".22" stroke="var(--s1)" stroke-width="2" stroke-linejoin="round"/>`;
+  keys.forEach((k, i) => {
+    const p = pt(i, g.dims[k].now), a = -Math.PI / 2 + i * 2 * Math.PI / n, lx = cx + (R + 16) * Math.cos(a), ly = cy + (R + 16) * Math.sin(a);
+    s += `<circle cx="${p[0]}" cy="${p[1]}" r="4.5" fill="var(--s1)" stroke="var(--surf)" stroke-width="2"/>`;
+    const anc = Math.abs(Math.cos(a)) < .25 ? "middle" : Math.cos(a) > 0 ? "start" : "end";
+    s += `<text class="ink" x="${lx}" y="${ly + (Math.sin(a) > .5 ? 12 : Math.sin(a) < -.5 ? -4 : 4)}" text-anchor="${anc}">${esc(g.dims[k].name)} <tspan font-weight="650">${g.dims[k].now}</tspan></text>`;
+  });
+  const dirTxt = { improving: "Improving", deteriorating: "Deteriorating", stable: "Stable" }[g.direction];
+  const lab = { "risk-on": "Risk-on", "risk-off": "Risk-off", mixed: "Mixed" }[g.label];
+  return `<div class="card">
+    <div class="cardhead"><h3>Macro regime</h3><span class="muted small">Average ${g.avg}${g.avg_prev != null ? `, was ${g.avg_prev} a month ago` : ""}</span></div>
+    <div class="rrow"><span class="rlabel">${lab}</span><span class="chip">${dirTxt}</span></div>
+    <p class="muted small">Weakest: ${esc(g.weakest.join(" and "))}. ${g.spread >= 40 ? "The dimensions disagree, so read the shape, not the average." : ""}</p>
+    <svg class="radar" viewBox="0 0 480 266" role="img" aria-label="Regime radar. ${keys.map(k => g.dims[k].name + " " + g.dims[k].now).join(", ")}">${s}</svg>
+    <div class="legend"><span class="lg"><span class="sw" style="border-color:var(--s1)"></span>Now</span>${g.avg_prev != null ? `<span class="lg"><span class="sw" style="border-color:var(--ink2);border-top-style:dashed"></span>About a month ago</span>` : ""}</div>
+    <details class="tbl"><summary>Show scores</summary><div class="scroll"><table><tr><th>Dimension</th><th>Now</th><th>Month ago</th><th>Based on</th></tr>${keys.map(k => `<tr><td>${esc(g.dims[k].name)}</td><td>${g.dims[k].now}</td><td>${g.dims[k].prev ?? "n/a"}</td><td style="text-align:left">${esc(g.dims[k].detail)}</td></tr>`).join("")}</table></div></details>
+  </div>`;
+}
+
+function renderInstruments(d) {
+  const sym = { headwind: "▼", tailwind: "▲", neutral: "–" };
+  const cards = d.instruments.map(i => {
+    if (i.price == null) return `<div class="card inst"><h3>${esc(i.id)}</h3><p class="muted small">No price data. Check the symbol in config.json.</p></div>`;
+    return `<div class="card inst">
+      <div class="top2"><div><h3>${esc(i.id)} <span class="muted small" style="font-weight:400">${esc(i.name)}</span></h3>
+        <div class="price">${nf(i.price, 2)}</div>
+        <div>${chipDelta(i.d1_pct, 2, "%")} <span class="muted small">today</span> &nbsp; ${chipDelta(i.d5_pct, 2, "%")} <span class="muted small">5 days</span></div></div>
+        ${spark(i.spark, { w: 110, h: 44 })}</div>
+      <div class="lens" role="list" aria-label="Macro lens">${i.lens.map(l => `<span class="chip" role="listitem" title="Sensitivity ${l.weight}">${sym[l.state]} ${esc(l.factor)}: ${l.state}</span>`).join("")}</div>
+      <p class="small"><b>Macro tilt: ${esc(i.tilt_label.toLowerCase())}.</b> <span class="muted">${esc(i.note)}</span></p>
+      ${i.warn ? `<div class="warn">${esc(i.warn)}</div>` : ""}
+    </div>`;
+  }).join("");
+  const pairs = d.pairs.map(p => `<p class="muted small" style="margin-top:8px">${esc(p.a)} minus ${esc(p.b)}: <b class="${cls(p.d1)} d" style="font-weight:650">${sg(p.d1)}%</b> today, <b class="${cls(p.d5)} d">${sg(p.d5)}%</b> over 5 days. Rates driving the tape usually shows up here first.</p>`).join("");
+  return `<div class="grid g2">${cards}</div>${pairs}`;
+}
+
+function renderTriggers(d) {
+  return `<div class="card"><div class="cardhead"><h3>Regime triggers</h3><span class="muted small">Live value against each threshold</span></div><div class="rows">
+    ${d.triggers.map(t => `<div class="row">${ICON[t.status]}<div><div>${esc(t.label)}${t.near ? `<span class="tag">Close to firing</span>` : ""}</div><div class="why">${t.status === "ok" || t.status === "na" ? "" : esc(t.why)}</div></div><div class="val">${esc(t.value)}<div class="state">${STATE_LABEL[t.status]}</div></div></div>`).join("")}
+  </div></div>`;
+}
+
+function renderFour(d) {
+  const f = d.four_market;
+  return `<div class="card"><div class="cardhead"><h3>Four-market check</h3><span class="muted small">Do the other markets agree with the move?</span></div>
+    <div class="rows">${f.rows.map(r => `<div class="row">${ICON[r.state]}<div><div>${esc(r.label)}</div><div class="why">${esc(r.why)}</div></div><div class="val">${esc(r.text)}<div class="state">${STATE_LABEL[r.state]}</div></div></div>`).join("")}</div>
+    <p style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)"><b>${esc(f.text)}</b></p>
+    <p class="muted small" style="margin-top:6px">One market can lie for a day. Four rarely lie together.</p>
+  </div>`;
+}
+
+function renderTiles(d) {
+  return `<div class="tiles">${d.tiles.map(t => `<div class="tile"><div class="muted small">${esc(t.label)}</div><div class="tv">${esc(t.value)}</div>
+    <div>${t.chg != null ? `<span class="d ${cls(t.chg)}">${arrow(t.chg)}${nf(Math.abs(t.chg), t.unit === "%" ? 2 : 1)}${t.unit === "%" ? "%" : " bp"}</span> ` : ""}<span class="muted small">${esc(t.sub || "")}</span></div></div>`).join("")}</div>`;
+}
+
+function renderRates(d) {
+  const r = d.rates; if (!r) return "";
+  const c = r.cycle, fed = r.fed;
+  const cyc = c ? `<div class="card"><div class="cardhead"><h3>Rate cycle</h3></div><div class="phase">${esc(c.phase[0] + c.phase.slice(1).toLowerCase())}</div>
+    <p class="small" style="margin:6px 0 12px">${esc(c.note)}</p>
+    <dl class="kv">${c.last_change ? `<dt>Last change</dt><dd>${sg(c.last_change.bp, 0)} bp, ${c.months_since} months ago</dd>` : ""}
+      ${r.priced_cuts ? `<dt>Cuts priced, next 12 months</dt><dd>${nf(r.priced_cuts.value, 1)}${r.priced_cuts.proxy ? " (proxy)" : ""}</dd>` : ""}
+      ${r.real ? `<dt>10Y real yield</dt><dd>${nf(r.real.real)}% (${sg(r.real.real_mo_bp, 0)} bp in a month)</dd><dt>10Y breakeven inflation</dt><dd>${nf(r.real.be)}%</dd>` : ""}
+      ${r.move ? `<dt>Curve, last month</dt><dd>${esc(r.move)}</dd>` : ""}</dl>
+    ${r.priced_cuts && r.priced_cuts.proxy ? `<p class="muted small" style="margin-top:8px">Cuts priced is a proxy: the gap between the policy rate and the 2Y yield, in 25 bp steps. No free source publishes fed funds futures.</p>` : ""}
+  </div>` : "";
+  let cor = "";
+  if (fed) {
+    const lo = fed.lo - .15, hi = fed.hi + .15, X = v => ((v - lo) / (hi - lo) * 100).toFixed(1) + "%";
+    cor = `<div class="card"><div class="cardhead"><h3>Policy corridor</h3><span class="chip">${fed.stress ? "SOFR above the band" : "Inside the band"}</span></div>
+      <div class="corridor"><div class="band" style="left:${X(fed.lo)};width:calc(${X(fed.hi)} - ${X(fed.lo)})"></div>
+      <div class="pt hi" style="left:${X(fed.effr)}"><span>Effective ${nf(fed.effr)}</span></div>
+      ${fed.sofr != null ? `<div class="pt lo" style="left:${X(fed.sofr)}"><span>SOFR ${nf(fed.sofr)}</span></div>` : ""}</div>
+      <dl class="kv" style="margin-top:6px"><dt>Target band</dt><dd>${nf(fed.lo)} to ${nf(fed.hi)}%</dd><dt>Interest on reserves</dt><dd>${nf(fed.iorb)}%</dd><dt>Reverse repo rate</dt><dd>${nf(fed.rrp)}%</dd></dl>
+      <p class="muted small" style="margin-top:8px">Plumbing. It only matters when funding rates drift above the band.</p></div>`;
+  }
+  const cats = r.curve.map(x => x.m);
+  const curveCard = `<div class="card"><div class="cardhead"><h3>Yield curve</h3><span class="muted small">The short end is policy. The long end is growth and inflation.</span></div>
+    <div class="chart" id="ch-curve"></div>
+    <div class="legend"><span class="lg"><span class="sw" style="border-color:var(--s1)"></span>Now</span><span class="lg"><span class="sw" style="border-color:var(--s2);border-top-style:dashed"></span>1 week ago</span><span class="lg"><span class="sw" style="border-color:var(--ink2);border-top-style:dotted"></span>1 month ago</span></div>
+    <details class="tbl"><summary>Show table</summary><div class="scroll"><table><tr><th>Maturity</th><th>Now</th><th>1 week</th><th>1 month</th><th>1 day (bp)</th></tr>${r.curve.map(x => `<tr><td>${x.m}</td><td>${nf(x.now)}</td><td>${nf(x.wk)}</td><td>${nf(x.mo)}</td><td>${sg(x.d1, 1)}</td></tr>`).join("")}</table></div></details></div>`;
+  const sp = Object.values(r.spreads);
+  const spState = b => b == null ? "" : b < 0 ? "Inverted" : b < 15 ? "Flat" : "Positive";
+  const spCard = sp.length ? `<div class="card"><div class="cardhead"><h3>Curve spreads</h3><span class="muted small">Un-inversion has been the dangerous part</span></div>
+    ${sp.map(s => `<div class="spk-row"><div><div>${esc(s.label)}</div><div class="why muted small">${spState(s.bp)}, ${sg(s.mo_bp, 0)} bp in a month</div></div><div class="val num" style="font-weight:650">${sg(s.bp, 0)} bp</div>${spark(s.spark, { w: 90, h: 28 })}</div>`).join("")}</div>` : "";
+  return `<section class="block">${secHead("Rates and the Fed", "Where policy stands, what the bond market expects, and how the curve is moving.")}
+    <div class="grid g2" style="margin-bottom:14px">${curveCard}<div class="grid">${cyc}${spCard}${cor}</div></div></section>`;
+}
+
+function renderCredit(d) {
+  const c = d.credit; if (!c) return "";
+  const tiers = `<div class="card"><div class="cardhead"><h3>Credit by quality</h3><span class="muted small">Stress starts at the bottom and works up. Watch CCC first.</span></div>
+    ${c.tiers.map(t => `<div class="spk-row"><div>${esc(t.tier)}</div><div class="num" style="text-align:right"><b>${nf(t.bp, 0)} bp</b> <span class="d ${cls(-(t.mo_bp ?? 0))}">${sg(t.mo_bp, 0)}</span></div>${spark(t.spark, { w: 90, h: 26, color: "var(--s1)" })}</div>`).join("")}
+    <p class="muted small" style="margin-top:8px">The change shown is over one month, in basis points. Falling is better.</p>
+    ${c.note ? `<div class="warn">${esc(c.note)}</div>` : ""}</div>`;
+  const thermo = `<div class="card"><div class="cardhead"><h3>High-yield spread</h3><span class="chip">${nf(c.bp, 0)} bp</span></div>
+    <div class="thermo" role="img" aria-label="High-yield band: ${esc(c.band)}">${c.bands.map((b, i) => `<div class="b ${i === c.band_idx ? "on" : ""}">${esc(b.name)}</div>`).join("")}</div>
+    <div class="thermo-scale"><span>below 300</span><span>300 to 450</span><span>450 to 600</span><span>600 to 800</span><span>above 800</span></div>
+    <p style="margin-top:12px"><b>${esc(c.band)}.</b> ${esc(c.action)}</p>
+    <p class="muted small" style="margin-top:4px">Equity read: ${esc(c.equity.toLowerCase())}. A move between bands is the event, and above 500 bp is an alert.</p>
+    ${c.vs_vix ? `<div class="warn">${esc(c.vs_vix)}</div>` : ""}
+    <div class="chart" id="ch-hy" style="margin-top:14px"></div>
+    <details class="tbl"><summary>Show recent values</summary><div class="scroll"><table><tr><th>Date</th><th>Spread (bp)</th></tr>${c.dates.slice(-10).reverse().map((dd, i) => `<tr><td>${dd}</td><td>${nf(c.spark[c.spark.length - 1 - i], 0)}</td></tr>`).join("")}</table></div></details></div>`;
+  return `<section class="block">${secHead("Credit", "Credit is slower than equities and usually right. When it disagrees with VIX, believe credit.")}<div class="grid g2">${thermo}${tiers}</div></section>`;
+}
+
+function renderVol(d) {
+  const v = d.vol; if (!v) return "";
+  const stateTxt = { contango: "Contango", backwardation: "Backwardation", flat: "Flat", unknown: "Curve unknown" }[v.state];
+  const lvl = { calm: "Calm", normal: "Normal", elevated: "Elevated", stress: "Stress" }[v.level];
+  const vrpRow = (lab, k) => v.vrp[k] ? `<tr><td>${lab}</td><td>${nf(v.vrp[k].iv, 1)}</td><td>${nf(v.vrp[k].rv, 1)}</td><td><b>${sg(v.vrp[k].vrp, 1)}</b></td></tr>` : "";
+  let cone = "";
+  if (v.cone && v.cone.p10 != null) {
+    const lo = Math.min(v.cone.p10, v.vrp.m1.vrp) - 1, hi = Math.max(v.cone.p90, v.vrp.m1.vrp) + 1, X = x => ((x - lo) / (hi - lo) * 100).toFixed(1) + "%";
+    cone = `<div class="cone" role="img" aria-label="Current premium sits at the ${v.cone.pct}th percentile of its five-year range"><div class="track"></div><div class="rng" style="left:${X(v.cone.p10)};width:calc(${X(v.cone.p90)} - ${X(v.cone.p10)})"></div>
+      <div class="mk" style="left:${X(v.vrp.m1.vrp)}"></div>
+      <div class="lb" style="left:${X(v.cone.p10)}">10th: ${sg(v.cone.p10, 1)}</div><div class="lb" style="left:${X(v.cone.p90)}">90th: ${sg(v.cone.p90, 1)}</div></div>
+      <p class="small">The 1-month premium is at the <b>${v.cone.pct}th percentile</b> of its range. ${v.cone.pct >= 80 ? "Protection is historically expensive, often after a scare." : v.cone.pct <= 20 ? "Protection is cheap, which usually means complacency." : "Nothing unusual."}</p>`;
+  }
+  const term = `<div class="card"><div class="cardhead"><h3>VIX term structure</h3><span class="chip">${stateTxt}</span></div>
+    <p class="small" style="margin-bottom:8px"><b>${nf(v.vix, 1)}</b> <span class="muted">(${lvl.toLowerCase()})</span> ${chipDelta(v.d1, 1)} today${v.vvix != null ? `, VVIX ${nf(v.vvix, 0)}` : ""}</p>
+    <div class="chart" id="ch-vix"></div>
+    <p class="muted small" style="margin-top:8px">${v.state === "backwardation" ? "The front is priced above the back. Stress is arriving now: size down and do not fade." : v.state === "flat" ? "The curve is flattening. Watch whether the front keeps rising." : "Contango is the ordinary state. Short-volatility strategies earn the roll."}${v.event_priced ? " The 1-week premium is far above the 1-month, so an event is priced in." : ""}</p>
+    <details class="tbl"><summary>Show table</summary><div class="scroll"><table><tr><th>Tenor</th><th>Volatility</th></tr>${v.curve.map(x => `<tr><td>${x.t}</td><td>${nf(x.v, 1)}</td></tr>`).join("")}</table></div></details></div>`;
+  const vrp = `<div class="card"><div class="cardhead"><h3>Volatility risk premium</h3><span class="muted small">Implied minus realized</span></div>
+    ${Object.keys(v.vrp).length ? `<div class="scroll"><table><tr><th>Horizon</th><th>Implied</th><th>Realized</th><th>Premium</th></tr>${vrpRow("1 week", "w1")}${vrpRow("1 month", "m1")}${vrpRow("3 months", "m3")}</table></div>
+    <p style="margin-top:10px"><b>${esc(v.vrp_read || "")}</b></p>${cone}
+    <p class="muted small" style="margin-top:8px">The premium is a regime check, not a trade. A positive number can flip negative very fast.</p>` : `<p class="muted small">Needs S&amp;P 500 and VIX history from Yahoo Finance.</p>`}</div>`;
+  return `<section class="block">${secHead("Volatility", "Read the shape before the level: contango or backwardation.")}<div class="grid g2">${term}${vrp}</div></section>`;
+}
+
+function renderEnergyDollar(d) {
+  const e = d.energy, x = d.dollar; if (!e && !x) return "";
+  let oil = "";
+  if (e) {
+    const pos = Math.max(0, Math.min(100, (e.wti - 60) / (120 - 60) * 100));
+    const sc = { supply_shock: "Supply shock active", demand_collapse: "Demand collapse active", none: "Neither scenario active" }[e.scenario];
+    const pb = e.scenario !== "none" ? e.playbooks[e.scenario] : null;
+    oil = `<div class="card"><div class="cardhead"><h3>Oil</h3><span class="chip">${sc}</span></div>
+      <div class="price num" style="font-size:28px;font-weight:700">$${nf(e.wti)}</div>
+      <div>${chipDelta(e.d1_pct, 2, "%")} <span class="muted small">today</span> &nbsp; ${chipDelta(e.d5_pct, 2, "%")} <span class="muted small">5 days</span></div>
+      <div class="cone" style="margin-top:22px" role="img" aria-label="WTI relative to the 70 and 110 dollar levels"><div class="track"></div><div class="mk" style="left:${pos}%"></div>
+        <div class="lb" style="left:${(70 - 60) / 60 * 100}%">$70</div><div class="lb" style="left:${(110 - 60) / 60 * 100}%">$110</div></div>
+      <p class="small">${e.scenario === "none" ? `$${nf(e.to_110, 0)} below the supply-shock level and $${nf(e.to_70, 0)} above the demand-collapse level.` : e.scenario === "supply_shock" ? "Inflationary and bad for growth. Energy leads, consumer and growth stocks lag, and rates rise." : "A growth scare. Energy and cyclicals lag, bonds rally, defensives hold up."}</p>
+      ${pb ? `<div class="pb">${["sell", "hold", "buy"].filter(k => pb[k]).map(k => `<div><b>${k[0].toUpperCase() + k.slice(1)}</b><span>${esc(pb[k].join(", "))}</span></div>`).join("")}<p class="muted small">A playbook, not a forecast.</p></div>` : ""}
+      ${e.brent != null ? `<p class="muted small" style="margin-top:8px">Brent $${nf(e.brent)}. Oil moves matter at the extremes and when the reason is supply.</p>` : ""}</div>`;
+  }
+  let dol = "";
+  if (x) {
+    dol = `<div class="card"><div class="cardhead"><h3>Dollar</h3><span class="chip">${x.above_108 ? "Above 108" : "Below 108"}</span></div>
+      <div class="price num" style="font-size:28px;font-weight:700">${nf(x.dxy)}</div>
+      <div>${chipDelta(x.d1_pct, 2, "%")} <span class="muted small">today</span> &nbsp; ${chipDelta(x.d5_pct, 2, "%")} <span class="muted small">5 days</span></div>
+      <div style="margin:14px 0 8px">${spark(x.spark, { w: 280, h: 56 })}</div>
+      <p class="small">${x.above_108 ? "Strong enough to put real pressure on global markets and multinational earnings. A headwind, not a sell signal." : `${nf(x.to_108)} points below the 108 watch level.`} Dollar and yields both rising is often the worst case for NQ.</p></div>`;
+  }
+  return `<section class="block">${secHead("Oil and the dollar", "Outside stress gauges. Pay attention when they move a lot or near the trigger levels.")}<div class="grid g2">${oil}${dol}</div></section>`;
+}
+
+/* ---------- page ---------- */
+function render(d) {
+  const m = d.meta, age = Math.round((Date.now() - new Date(m.as_of + "T00:00:00Z").getTime()) / 864e5);
+  const stale = age > 4;
+  let html = `<header class="top"><h1>Macro cockpit</h1><div class="meta">Data as of ${esc(m.as_of)}. Built ${esc(m.generated_at)}.</div>
+    ${stale ? `<span class="chip" style="border-color:var(--warn)">${age} days old</span>` : ""}
+    ${m.errors.length && m.mode === "live" ? `<span class="chip" style="border-color:var(--warn)">${m.errors.length} series missing</span>` : ""}
+    <button class="theme" id="theme" aria-label="Change colour theme">Theme</button></header>`;
+  if (m.mode === "demo") html += `<div class="banner"><b>Demo data.</b> Every number here is synthetic, so none of it is market data. The first scheduled run replaces it with live data.</div>`;
+  html += `<div class="hero">${renderPosture(d)}${renderRegime(d)}</div>`;
+  html += `<section class="block" style="margin-top:20px">${secHead("Your instruments", "Which way the macro backdrop is leaning on each one. Add more in config.json.")}${renderInstruments(d)}</section>`;
+  html += `<section class="block">${secHead("Before the open", "Read the triggers, then check whether the other markets agree with the move.")}<div class="grid g2">${renderTriggers(d)}${renderFour(d)}</div></section>`;
+  html += `<section class="block">${secHead("Snapshot", "Read once before the open and note anything that moved sharply overnight. These change slowly, so do not watch them intraday.")}${renderTiles(d)}</section>`;
+  html += renderRates(d) + renderCredit(d) + renderVol(d) + renderEnergyDollar(d);
+  html += `<footer><p>Context, not entries. The regime tells you how much to trust your levels and how big to trade. Price and order flow tell you when to act.</p>
+    <details><summary>Data notes${m.errors.length ? ` (${m.errors.length})` : ""}</summary><div style="padding-top:8px">
+      <p>Sources: FRED for yields, credit, jobs, inflation and the Fed. Yahoo Finance for VIX, dollar, oil and futures prices. Fed funds futures are not free, so cuts priced is a proxy. Gamma exposure is not included.</p>
+      ${m.errors.length ? `<ul>${m.errors.map(e => `<li>${esc(e)}</li>`).join("")}</ul>` : "<p>All series loaded.</p>"}</div></details></footer>`;
+  $("#app").innerHTML = html;
+  initTheme();
+  // charts
+  if (d.rates && d.rates.curve.length) {
+    const cr = d.rates.curve;
+    lineChart($("#ch-curve"), { cats: cr.map(x => x.m), height: 230, aria: "Treasury yield curve now, one week ago and one month ago", yfmt: x => nf(x, 1) + "%", tipfmt: x => nf(x, 2) + "%", endLabels: false, markers: false,
+      series: [{ name: "Now", values: cr.map(x => x.now), color: css("s1"), width: 2.5 }, { name: "1 week ago", values: cr.map(x => x.wk), color: css("s2"), dash: "6 4", width: 1.75 }, { name: "1 month ago", values: cr.map(x => x.mo), color: css("ink2"), dash: "2 4", width: 1.75 }] });
+  }
+  if (d.credit && $("#ch-hy")) {
+    const c = d.credit;
+    lineChart($("#ch-hy"), { cats: c.dates, height: 200, aria: "High-yield spread over the past year", yfmt: x => nf(x, 0), tipfmt: x => nf(x, 0) + " bp", xlab: s => { const t = new Date(s + "T00:00:00Z"); return t.toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" }); },
+      ref: [{ v: 450, label: "450 concern" }, { v: 300, label: "300 euphoria" }], series: [{ name: "HY spread", values: c.spark.map(x => x * 100), color: css("s1"), width: 2 }] });
+  }
+  if (d.vol && $("#ch-vix")) {
+    const v = d.vol;
+    lineChart($("#ch-vix"), { cats: v.curve.map(x => x.t), height: 190, aria: "VIX term structure", yfmt: x => nf(x, 0), tipfmt: x => nf(x, 1), markers: true, series: [{ name: "Implied volatility", values: v.curve.map(x => x.v), color: css("s1"), width: 2 }] });
+  }
+}
+
+function initTheme() {
+  const root = document.documentElement, btn = $("#theme");
+  let saved = null; try { saved = localStorage.getItem("mc-theme"); } catch (e) { /* ignore */ }
+  if (saved) root.setAttribute("data-theme", saved);
+  const label = () => { const t = root.getAttribute("data-theme"); btn.textContent = t === "dark" ? "Theme: dark" : t === "light" ? "Theme: light" : "Theme: auto"; };
+  label();
+  btn.addEventListener("click", () => {
+    const t = root.getAttribute("data-theme"), nx = t === null ? "dark" : t === "dark" ? "light" : null;
+    if (nx) root.setAttribute("data-theme", nx); else root.removeAttribute("data-theme");
+    try { nx ? localStorage.setItem("mc-theme", nx) : localStorage.removeItem("mc-theme"); } catch (e) { /* ignore */ }
+    label(); render(window.__d);
+  });
+}
+
+fetch("data.json?" + Date.now()).then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+  .then(d => { window.__d = d; render(d); })
+  .catch(err => {
+    $("#app").innerHTML = `<div class="banner err"><b>Could not load data.json.</b> ${esc(err.message)}. If you opened this file straight from your computer, browsers block it. Serve the folder instead (run <code>python3 -m http.server</code> inside docs) or open the GitHub Pages address.</div>`;
+  });
+</script>
+</body>
+</html>
