@@ -471,6 +471,159 @@ def build_calendar(path, today, back=3, horizon=45):
 
 
 # --------------------------------------------------------------------------
+# Release scoreboard: previous, actual, revision (expected is typed in the page)
+# --------------------------------------------------------------------------
+# id, group, label, series key, kind, unit, decimals, in-line band, scale, word if above, word if below, calendar name
+REL = [
+    ("nfp", "Jobs", "Payrolls change", "payems", "chg", "k", 0, 25, 1, "Stronger jobs", "Weaker jobs", "Jobs report (NFP)"),
+    ("unrate", "Jobs", "Unemployment rate", "unrate", "lvl", "%", 1, 0.05, 1, "Weaker jobs", "Stronger jobs", "Jobs report (NFP)"),
+    ("claims", "Jobs", "Initial jobless claims", "claims", "lvl", "k", 0, 8, 0.001, "Weaker jobs", "Stronger jobs", "Jobless claims"),
+    ("cpi_yoy", "Inflation", "CPI, year over year", "cpi", "yoy", "%", 1, 0.05, 1, "Hotter, hawkish", "Cooler, dovish", "CPI"),
+    ("core_cpi_mom", "Inflation", "Core CPI, month over month", "core_cpi", "mom", "%", 1, 0.05, 1, "Hotter, hawkish", "Cooler, dovish", "CPI"),
+    ("core_pce_mom", "Inflation", "Core PCE, month over month", "core_pce", "mom", "%", 1, 0.05, 1, "Hotter, hawkish", "Cooler, dovish", "PCE inflation"),
+    ("ppi_mom", "Inflation", "PPI, month over month", "ppi", "mom", "%", 1, 0.1, 1, "Hotter, hawkish", "Cooler, dovish", "PPI"),
+    ("retail_mom", "Spending", "Retail sales, month over month", "retail", "mom", "%", 1, 0.2, 1, "Stronger spending", "Weaker spending", "Retail sales"),
+]
+
+
+def fetch_initial(sid, api_key, http_get, start):
+    """First-reported values for a FRED series (needs the API key)."""
+    q = urllib.parse.urlencode({"series_id": sid, "api_key": api_key, "file_type": "json", "observation_start": start,
+                                "output_type": 4, "realtime_start": "1776-07-04", "realtime_end": "9999-12-31"})
+    data = json.loads(http_get("https://api.stlouisfed.org/fred/series/observations?" + q))
+    return {o["date"]: float(o["value"]) for o in data["observations"] if o["value"] not in (".", "")}
+
+
+def fetch_initials(cfg, today, http_get, errors, api_key):
+    out = {}
+    if not api_key:
+        errors.append("Revisions: FRED API key not set, so first-reported values are skipped.")
+        return out
+    start = (today - dt.timedelta(days=3 * 366)).isoformat()
+    for key in sorted({r[3] for r in REL}):
+        sid = (cfg.get("fred") or {}).get(key)
+        if not sid:
+            continue
+        try:
+            out[key] = fetch_initial(sid, api_key, http_get, start)
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"Revisions ({sid}): {str(e)[:90]}")
+    return out
+
+
+# Expected (consensus) numbers: the free public Forex Factory weekly JSON feed (unofficial).
+FF_URLS = ["https://nfs.faireconomy.media/ff_calendar_thisweek.json", "https://nfs.faireconomy.media/ff_calendar_nextweek.json"]
+FF_TITLES = {"nfp": "non-farm employment change", "unrate": "unemployment rate", "claims": "unemployment claims", "cpi_yoy": "cpi y/y",
+             "core_cpi_mom": "core cpi m/m", "core_pce_mom": "core pce price index m/m", "ppi_mom": "ppi m/m", "retail_mom": "retail sales m/m"}
+
+
+def _num(x):
+    if x is None:
+        return None
+    t = str(x).strip().replace(",", "").replace("%", "")
+    if not t:
+        return None
+    mult = 1.0
+    if t[-1] in "kK":
+        t = t[:-1]
+    elif t[-1] in "mM":
+        t, mult = t[:-1], 1000.0
+    try:
+        return float(t) * mult
+    except ValueError:
+        return None
+
+
+def ref_period(rid, event_date):
+    """Which data period a release on this date covers (matches the series dates)."""
+    e = D(event_date)
+    if rid == "claims":
+        return (e - dt.timedelta(days=5)).isoformat()
+    last = e.replace(day=1) - dt.timedelta(days=1)
+    return last.replace(day=1).isoformat()
+
+
+def fetch_consensus(http_get, errors):
+    items = []
+    for u in FF_URLS:
+        try:
+            for it in json.loads(http_get(u)):
+                if str(it.get("country", "")).upper() == "USD":
+                    items.append(it)
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"Expected numbers ({u.rsplit('/', 1)[-1]}): {str(e)[:80]}")
+    return items
+
+
+def update_store(store, items, today):
+    for rid, title in FF_TITLES.items():
+        for it in items:
+            if str(it.get("title", "")).strip().lower() != title:
+                continue
+            f = _num(it.get("forecast"))
+            ed = str(it.get("date", ""))[:10]
+            if f is None or len(ed) != 10:
+                continue
+            key = f"{rid}|{ref_period(rid, ed)}"
+            old = store.get(key)
+            if old and old["event_date"] <= today.isoformat():
+                continue  # frozen once the release day has passed
+            store[key] = {"forecast": f, "event_date": ed}
+    cutoff = (today - dt.timedelta(days=150)).isoformat()
+    return {k: v for k, v in store.items() if v["event_date"] >= cutoff}
+
+
+
+def _next_period(d, weekly):
+    x = D(d)
+    if weekly:
+        return (x + dt.timedelta(days=7)).isoformat()
+    y, m = (x.year + 1, 1) if x.month == 12 else (x.year, x.month + 1)
+    return dt.date(y, m, 1).isoformat()
+
+
+def build_releases(raw, init, cal, store=None):
+    store = store or {}
+    rows = []
+    evs = (cal or {}).get("events", [])
+    today = (cal or {}).get("today", "")
+    for rid, grp, label, key, kind, unit, dec, inline, scale, up, dn, evname in REL:
+        s = raw.get(key)
+        need = {"yoy": 14, "mom": 3, "chg": 3, "lvl": 3}[kind]
+        if not s or len(s) < need:
+            continue
+        i0 = len(s) - 1
+        first_map = init.get(key, {})
+
+        def metric(i, first=False):
+            v = first_map.get(s[i][0]) if first else s[i][1]
+            if v is None:
+                return None
+            if kind == "yoy":
+                return (v / s[i - 12][1] - 1) * 100
+            if kind == "mom":
+                return (v / s[i - 1][1] - 1) * 100
+            if kind == "chg":
+                return v - s[i - 1][1]
+            return v * scale
+
+        act, prev = metric(i0), metric(i0 - 1)
+        pf = metric(i0 - 1, True)
+        rev = None if pf is None or prev is None else prev - pf
+        weekly = key == "claims"
+        nxt = next((e["date"] for e in evs if e["name"] == evname and e["date"] >= today), None)
+        rows.append({"id": rid, "group": grp, "label": label, "unit": unit, "dec": dec, "inline": inline, "up": up, "dn": dn,
+                     "period": s[i0][0], "weekly": weekly, "next_period": _next_period(s[i0][0], weekly),
+                     "actual": None if act is None else round(act, 3), "prev": None if prev is None else round(prev, 3),
+                     "prev_first": None if pf is None else round(pf, 3), "revision": None if rev is None else round(rev, 3),
+                     "next_date": nxt,
+                     "expected": (store.get(f"{rid}|{s[i0][0]}") or {}).get("forecast"),
+                     "next_expected": (store.get(f"{rid}|{_next_period(s[i0][0], weekly)}") or {}).get("forecast")})
+    return rows
+
+
+
+# --------------------------------------------------------------------------
 # Daily regime tag and history
 # --------------------------------------------------------------------------
 def daily_tag(day, post, regime, vol, rates, credit, fm):
@@ -558,6 +711,12 @@ def demo_raw(raw, cfg, S, path, bdays, weekly, monthly, rnd):
         lvl += (170 if not S else (170 if i < 40 else 20 - (i - 40) * 15)) + rnd.gauss(0, 15)
         out.append(lvl)
     put("payems", M, out)
+    for k, base, step in (("ppi", 140.0, .25), ("retail", 600000.0, .4)):
+        v, ser = base, []
+        for i in range(48):
+            v *= 1 + (step + rnd.gauss(0, .3)) / 100
+            ser.append(v)
+        put(k, M, ser)
     W = weekly(156)
     put("walcl", W, path(156, [(0, 7.2e6), (.5, 6.6e6), (1, 6.65e6 if not S else 6.3e6)], 8000, rnd))
     put("tga", W, path(156, [(0, 6.5e5), (1, 8.2e5 if not S else 9.5e5)], 15000, rnd))
@@ -565,7 +724,7 @@ def demo_raw(raw, cfg, S, path, bdays, weekly, monthly, rnd):
     return raw
 
 
-def build_all(raw, cfg, today, http_get, errors, demo, S, post_level=None, regime=None, cal_path=None, cot_demo_rnd=None):
+def build_all(raw, cfg, today, http_get, errors, demo, S, post_level=None, regime=None, cal_path=None, cot_demo_rnd=None, api_key=None, store=None):
     out = {"labor": build_labor(raw), "inflation": build_inflation(raw), "liquidity": build_liquidity(raw),
            "correlations": build_correlations(raw, cfg), "rotation": build_rotation(raw, cfg)}
     if demo:
@@ -587,4 +746,35 @@ def build_all(raw, cfg, today, http_get, errors, demo, S, post_level=None, regim
         cot = fetch_cot(cfg, http_get, errors)
     out["positioning"] = build_positioning(cot)
     out["calendar"] = build_calendar(cal_path, today) if cal_path else None
+    if demo:
+        rnd = cot_demo_rnd
+        init = {}
+        for rid, grp, label, key, kind, unit, dec, inline, scale, up, dn, ev in REL:
+            ser = raw.get(key)
+            if not ser or len(ser) < 3:
+                continue
+            m = {}
+            for d, v in ser[-3:-1]:
+                m[d] = v + (rnd.gauss(0, 20000 if key == "payems" else 0) if key == "payems" else v * rnd.gauss(0, .0004))
+            if key == "payems":
+                m[ser[-2][0]] = ser[-2][1] - 14
+            init[key] = m
+    else:
+        init = fetch_initials(cfg, today, http_get, errors, api_key)
+    store = dict(store or {})
+    if demo:
+        store = {}
+        for rid, grp, label, key, kind, unit, dec, inline, scale, up, dn, ev in REL:
+            ser = raw.get(key)
+            if not ser or len(ser) < 14:
+                continue
+            row = next((r for r in build_releases(raw, init, out["calendar"]) if r["id"] == rid), None)
+            if row and row["actual"] is not None:
+                off = (cot_demo_rnd.choice([-1, 0, 0, 1, 2])) * row["inline"] * 1.5
+                store[f"{rid}|{row['period']}"] = {"forecast": round(row["actual"] - off, row["dec"]), "event_date": today.isoformat()}
+                store[f"{rid}|{row['next_period']}"] = {"forecast": round(row["actual"], row["dec"]), "event_date": (today + dt.timedelta(days=9)).isoformat()}
+    elif not demo:
+        store = update_store(store, fetch_consensus(http_get, errors), today)
+    out["consensus_store"] = store
+    out["releases"] = build_releases(raw, init, out["calendar"], store) if out["calendar"] else []
     return out
