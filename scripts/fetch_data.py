@@ -878,8 +878,15 @@ def main():
     tiles = build_tiles(raw, vals, rates, wti_s, dxy_s)
 
     S = a.demo == "stress"
+    old_store = {}
+    try:
+        _old = json.loads((ROOT / "docs" / "data.json").read_text())
+        if _old.get("meta", {}).get("mode") == "live":
+            old_store = _old.get("consensus_store", {}) or {}
+    except Exception:  # noqa: BLE001
+        pass
     ex = extras.build_all(raw, cfg, TODAY, http_get, errors, bool(a.demo), S, cal_path=str(ROOT / "calendar.json"),
-                          cot_demo_rnd=random.Random(11))
+                          cot_demo_rnd=random.Random(11), api_key=os.environ.get("FRED_API_KEY"), store=old_store)
     latest = max((s[-1][0] for k, s in raw.items() if k in ("dgs10", "hy", "vix", "dxy") and s), default=TODAY.isoformat())
     out = {
         "meta": {"mode": "demo" if a.demo else "live", "generated_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
