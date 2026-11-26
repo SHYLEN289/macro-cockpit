@@ -197,6 +197,11 @@ footer summary { cursor: pointer; }
 .ribbon { display: flex; gap: 2px; flex-wrap: wrap; }
 .ribbon i { width: 9px; height: 22px; border-radius: 2px; display: block; }
 .ribbon i.n { background: var(--good); } .ribbon i.e { background: var(--warn); } .ribbon i.c { background: var(--crit); }
+.how { margin: -6px 0 14px; font-size: 13.5px; max-width: 70ch; }
+.how summary { cursor: pointer; color: var(--s1); font-weight: 600; width: fit-content; }
+.how dl { margin: 8px 0 0; padding: 10px 14px; border-left: 3px solid var(--s1); background: var(--wash); border-radius: 0 6px 6px 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; }
+.how dt { font-weight: 600; } .how dd { margin: 0; color: var(--ink2); }
+@media (max-width: 600px) { .how dl { grid-template-columns: 1fr; gap: 0; } .how dd { margin-bottom: 8px; } }
 @media (max-width: 900px) { .g4 { grid-template-columns: 1fr 1fr; } .ev { grid-template-columns: 76px 1fr; } .ev .lt, .ev .ntag { grid-column: 2; } .ladder { grid-template-columns: 1fr 1fr; } }
 
 @media (max-width: 900px) {
@@ -310,7 +315,30 @@ function lineChart(el, cfg) {
 /* ---------- sections ---------- */
 function chipDelta(v, d = 2, unit = "") { return v == null ? "" : `<span class="d ${cls(v)}">${arrow(v)}${nf(Math.abs(v), d)}${unit}</span>`; }
 
-function secHead(title, sub) { return `<div class="sec-head"><h2>${esc(title)}</h2></div><p class="sec-sub">${esc(sub)}</p>`; }
+const HOW = {
+  "Your instruments": ["Every morning, first thing after the posture.", "Shows which way the macro backdrop leans for each market you trade. The lean is context, not a signal.", "Neutral is normal. A bearish lean means size smaller and be pickier on longs. It never tells you to enter or exit.", "Use it to set your size and how much to trust your levels. Entries still come from price and order flow."],
+  "Before the open": ["Every morning, before the open.", "The triggers are 9 fixed lines (10Y yield, HY spread, oil, VIX, CPI, dollar and others). The four-market check asks whether stocks, bonds, credit and the dollar agree.", "Most triggers should be OK. One alert means pay attention. Several at once, or the four markets disagreeing, means stress is building.", "If triggers are firing, reduce size and avoid selling premium. If everything is OK and the markets agree, trade your plan as normal."],
+  "Snapshot": ["Once, before the open.", "Key levels in one view: yields, curve, credit, VIX, dollar and oil.", "Look for anything that moved sharply overnight. Slow drift is normal.", "Note big overnight moves. Do not watch these during the day, because they change slowly."],
+  "Rates and the Fed": ["Once a day, in more detail on the weekend.", "Where the rate cycle is, how the yield curve looks, and how the 10Y and 2Y are moving.", "A positive curve and steady yields is normal. A curve that goes negative again after un-inverting, or a fast jump in the 10Y, is a warning.", "Rising yields hurt NQ more than ES. If yields are spiking, expect pressure on tech and be careful with long size."],
+  "Credit": ["Weekly, and a glance each morning.", "The high-yield spread shows how nervous lenders are. Credit moves slower than stocks and is usually right.", "Around 300 bp or less is calm, 450 bp is a concern, and the higher bands are stress. Watch whether it is widening or tightening this month.", "If credit and VIX disagree, believe credit. Widening credit with a calm VIX means the calm may be fragile."],
+  "Volatility": ["Every morning.", "The shape of the VIX curve and the volatility premium (implied minus realized).", "Contango (later months higher) is normal. Backwardation (near months higher) means real stress. A negative premium means the market is moving more than options priced.", "In backwardation, cut size and do not sell premium. In contango with a positive premium, conditions are normal."],
+  "Oil and the dollar": ["Weekly, plus when they move a lot.", "Outside pressure gauges. A strong dollar and a big oil move both tighten conditions.", "A dollar above 108 is a headwind. Oil moves of a few percent are normal. Sharp spikes or collapses matter.", "Treat them as background. They matter most when they move fast or sit near the trigger levels."],
+  "Labor": ["Weekly, on the weekend.", "Unemployment, the Sahm rule, jobless claims and payrolls show whether the job market is holding.", "A Sahm rule reading at or above 0.50 is a recession signal. Claims near their 52-week low is healthy. Claims climbing and payrolls slowing is softening.", "Bad jobs news matters when it is a trend, not a single week. Use it to decide how defensive to be."],
+  "Inflation": ["Weekly, and on CPI and PCE release days.", "Inflation versus its 3-month pace. The 3-month pace tells you where inflation is heading, and the yearly rate tells you where it has been.", "A 3-month pace above the yearly rate means inflation is heating up. Below means cooling. The Fed's target is 2%.", "Heating inflation means the Fed stays tight and yields stay high, which pressures NQ. Cooling inflation gives stocks room."],
+  "Liquidity": ["Weekly.", "Net liquidity is the Fed balance sheet minus Treasury cash minus reverse repo. It is the money available to chase assets.", "A change of $50 billion or more over 4 weeks counts as improving or tightening. Flat is normal.", "Improving liquidity is a tailwind for risk assets. Tightening is a headwind. It sets the tone, not the entry."],
+  "Correlations": ["Weekly.", "How stocks move relative to yields, VIX, credit, bonds, the dollar and oil, now versus the usual.", "Relationships near their usual values are normal. A break means the old relationship stopped working.", "Two or more breaks means the market is behaving unusually. Reduce size and do not sell premium until they settle."],
+  "Rotation": ["Weekly.", "Which sectors lead and lag, and whether that matches what the macro story predicts. It also shows risk-appetite ratios like small caps versus large.", "Matches means the market agrees with macro. Disagrees means trust the rotation, because money is the more honest signal.", "Leaders being defensive (utilities, staples) means caution. Cyclicals and tech leading means risk appetite is healthy."],
+  "Positioning": ["Weekly. The data is from the CFTC and lags by a few days.", "How crowded leveraged funds are in NQ and ES, on a 0 to 100 index.", "Between 10 and 90 is normal. Above 90 is a crowded long, below 10 is a crowded short.", "Crowded trades unwind fast. At an extreme, expect sharper reversals and do not chase."],
+  "Economic calendar": ["Sunday for the week, and a glance each morning.", "Releases by importance (Tier 1 is the biggest) and the Fed quiet period before each meeting.", "Tier 1 days (jobs report, CPI, Fed decision) are the ones that move markets. The quiet period means the Fed is not speaking.", "Trade smaller or stand aside around Tier 1 releases. Do not hold size through a surprise you cannot control."],
+  "Pre-market bias builder": ["Every morning, after reading the Today page.", "It builds your bias in four layers, from slow to fast, then writes it with an invalidation.", "If slow and fast layers are both calm, trust the map. If only the fast layers are stressed, it is probably a temporary scare. If both are stressed, size down.", "Type your gamma levels, tick the 9 AM boxes, read the bias, and save it. If price hits the invalidation, switch your view and do not argue with it."],
+  "History": ["When you want to review, for example on weekends.", "One row is saved each run, so you can see how long the market stayed in each posture.", "Long stretches of Normal are common. Short Critical bursts often come after Elevated build-ups.", "Use it to learn what the build-up to a bad week looked like, then compare to your journal."]
+};
+const HOWL = ["When to check", "What it shows", "What to expect", "What to do"];
+function howBlock(t) {
+  const h = HOW[t]; if (!h) return "";
+  return `<details class="how"><summary>How to use this</summary><dl>${h.map((x, i) => `<dt>${HOWL[i]}</dt><dd>${esc(x)}</dd>`).join("")}</dl></details>`;
+}
+function secHead(title, sub) { return `<div class="sec-head"><h2>${esc(title)}</h2></div><p class="sec-sub">${esc(sub)}</p>${howBlock(title)}`; }
 
 function renderPosture(d) {
   const p = d.posture, lv = p.level;
