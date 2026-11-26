@@ -1,0 +1,93 @@
+{
+  "_help": "Edit this file to add instruments or tune thresholds. Nothing else needs to change.",
+
+  "instruments": [
+    {
+      "id": "NQ",
+      "name": "Nasdaq-100 futures",
+      "yahoo": "NQ=F",
+      "sens": { "rates": 1.0, "dollar": 0.8, "credit": 0.7, "vol": 1.0 },
+      "note": "Growth-heavy and long-duration, so it feels real yields first."
+    },
+    {
+      "id": "ES",
+      "name": "S&P 500 futures",
+      "yahoo": "ES=F",
+      "sens": { "rates": 0.6, "dollar": 0.6, "credit": 0.8, "vol": 1.0 },
+      "note": "Broader mix with more financials, energy and staples."
+    }
+  ],
+
+  "pairs": [["NQ", "ES"]],
+
+  "fred": {
+    "dgs3mo": "DGS3MO", "dgs2": "DGS2", "dgs5": "DGS5", "dgs7": "DGS7",
+    "dgs10": "DGS10", "dgs20": "DGS20", "dgs30": "DGS30",
+    "t10y2y": "T10Y2Y", "t10y3m": "T10Y3M",
+    "real10": "DFII10", "be10": "T10YIE",
+    "effr": "EFFR", "tar_hi": "DFEDTARU", "tar_lo": "DFEDTARL",
+    "sofr": "SOFR", "iorb": "IORB", "rrp_rate": "RRPONTSYAWARD",
+    "hy": "BAMLH0A0HYM2", "ig": "BAMLC0A0CM", "bbb": "BAMLC0A4CBBB",
+    "bb": "BAMLH0A1HYBB", "b": "BAMLH0A2HYB", "ccc": "BAMLH0A3HYC",
+    "vix_f": "VIXCLS", "vix3m_f": "VXVCLS",
+    "wti_f": "DCOILWTICO", "brent_f": "DCOILBRENTEU",
+    "cpi": "CPIAUCSL", "core_cpi": "CPILFESL", "core_pce": "PCEPILFE", "pce": "PCEPI",
+    "unrate": "UNRATE", "claims": "ICSA", "sahm": "SAHMREALTIME",
+    "gdpnow": "GDPNOW", "nfci": "NFCI"
+  },
+
+  "yahoo": {
+    "vix": "^VIX", "vix9d": "^VIX9D", "vix3m": "^VIX3M", "vix6m": "^VIX6M",
+    "vvix": "^VVIX", "spx": "^GSPC", "dxy": "DX-Y.NYB",
+    "wti": "CL=F", "brent": "BZ=F"
+  },
+
+  "history_years": { "default": 3, "t10y2y": 4, "cpi": 4, "core_cpi": 4, "core_pce": 4, "pce": 4 },
+  "yahoo_range": { "default": "2y", "vix": "5y", "vix9d": "5y", "vix3m": "5y", "spx": "5y" },
+
+  "manual": {
+    "priced_cuts_12m": null,
+    "_note": "No free source exists for fed funds futures. Type a number here (for example 2.5) to override the 2Y-yield proxy."
+  },
+
+  "regime": {
+    "risk_on_at": 65,
+    "risk_off_at": 35,
+    "direction_band": 3,
+    "_note": "Each anchor is [value, score 0-100]. Scores between anchors are interpolated. These are our own definitions: the lessons name the five dimensions but not the formulas.",
+    "anchors": {
+      "inflation": [[2.0, 100], [2.5, 80], [3.0, 55], [3.5, 30], [4.5, 0]],
+      "sahm":      [[0.0, 90], [0.2, 75], [0.35, 45], [0.5, 15], [1.0, 0]],
+      "claims_ratio": [[1.0, 90], [1.1, 70], [1.25, 40], [1.5, 10]],
+      "gdpnow":    [[-1, 5], [0, 25], [1, 45], [2, 65], [3, 85], [4, 95]],
+      "curve_3m10y": [[-1, 20], [0, 45], [1, 70], [2.5, 90]],
+      "hy_bp":     [[250, 75], [300, 85], [450, 60], [600, 25], [800, 5]],
+      "nfci":      [[-0.8, 95], [-0.4, 75], [0, 50], [0.3, 25], [0.8, 5]],
+      "vix":       [[12, 90], [16, 75], [20, 55], [25, 30], [30, 15], [40, 3]]
+    }
+  },
+
+  "triggers": [
+    { "id": "y10_hi", "label": "10Y yield above 4.50%", "val": "dgs10", "op": ">", "level": 4.5, "status": "watch", "near": 0.15, "fmt": "{:.2f}%", "why": "Rates are becoming a real headwind for valuations." },
+    { "id": "y10_lo", "label": "10Y yield below 4.00%", "val": "dgs10", "op": "<", "level": 4.0, "status": "watch", "near": 0.15, "fmt": "{:.2f}%", "why": "The market is pricing slower growth or more cuts." },
+    { "id": "hy", "label": "HY spread above 500 bp", "val": "hy_bp", "op": ">", "level": 500, "status": "alert", "near": 40, "fmt": "{:.0f} bp", "why": "Credit stress." },
+    { "id": "wti_hi", "label": "WTI above $110", "val": "wti", "op": ">", "level": 110, "status": "alert", "near": 6, "fmt": "${:.2f}", "why": "Oil supply shock: inflation and growth both hurt." },
+    { "id": "wti_lo", "label": "WTI below $70", "val": "wti", "op": "<", "level": 70, "status": "watch", "near": 4, "fmt": "${:.2f}", "why": "Possible demand collapse." },
+    { "id": "vix", "label": "VIX above 30", "val": "vix", "op": ">", "level": 30, "status": "alert", "near": 3, "fmt": "{:.1f}", "why": "Equity stress." },
+    { "id": "cpi", "special": "cpi_sustained", "label": "CPI above 3.5%, sustained", "status": "watch", "why": "Inflation is not coming down on its own." },
+    { "id": "reinv", "special": "reinversion", "label": "2s10s back below zero after un-inverting", "status": "crisis", "why": "The curve whipsawed: tight policy against a weakening economy." },
+    { "id": "dxy", "label": "Dollar index above 108", "val": "dxy", "op": ">", "level": 108, "status": "watch", "near": 1.0, "fmt": "{:.2f}", "why": "A strong dollar tightens global conditions." }
+  ],
+
+  "four_market": {
+    "yield_jump_bp": 6,
+    "yield_collapse_bp": -10,
+    "dollar_flat_pct": 0.2,
+    "dollar_stress_pct": 0.4,
+    "vix_up_pts": 1.0,
+    "credit_ok_bp": 5,
+    "credit_stress_bp": 15
+  },
+
+  "vix_curve": { "contango_min_slope": 1.0 }
+}
