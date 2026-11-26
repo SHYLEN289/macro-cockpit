@@ -72,7 +72,9 @@
     "payems": "PAYEMS",
     "walcl": "WALCL",
     "tga": "WTREGEN",
-    "rrp_on": "RRPONTSYD"
+    "rrp_on": "RRPONTSYD",
+    "retail": "RSAFS",
+    "ppi": "PPIFIS"
   },
   "yahoo": {
     "vix": "^VIX",
