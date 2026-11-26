@@ -1,0 +1,30 @@
+name: Update macro data
+on:
+  schedule:
+    - cron: "30 11 * * 1-5"   # weekdays, ~7:30am New York (before the open)
+    - cron: "30 21 * * 1-5"   # after the close
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build data.json
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python scripts/fetch_data.py
+      - name: Commit changes
+        run: |
+          git config user.name "macro-bot"
+          git config user.email "macro-bot@users.noreply.github.com"
+          git add docs/data.json data/history.csv
+          git diff --staged --quiet || git commit -m "Update macro data"
+          git push
