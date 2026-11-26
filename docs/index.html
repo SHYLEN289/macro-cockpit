@@ -770,13 +770,13 @@ const perLab = r => { const x = new Date(r.period + "T00:00:00Z"); return r.week
 const uStr = (v, r) => v == null ? "n/a" : nf(v, r.dec) + (r.unit === "%" ? "%" : "k");
 const toNum = v => { const n = parseFloat(String(v == null ? "" : v).replace(/[%k,\s]/gi, "")); return isNaN(n) ? null : n; };
 function surpriseCell(r, exp) {
-  if (exp == null || r.actual == null) return `<span class="muted small">Expected number not available yet</span>`;
+  if (exp == null || r.actual == null) return `<span class="muted small">Starts with the next release</span>`;
   const a = +r.actual.toFixed(r.dec), s = a - exp, mag = Math.abs(s) / r.inline;
   const word = mag < 1 ? "In line" : s > 0 ? r.up : r.dn, ic = mag < 1 ? ICON.neutral : mag < 2 ? ICON.watch : ICON.alert;
   return `<div>${ic} <b>${sg(s, r.dec)}${r.unit === "%" ? " pp" : "k"}</b></div><div class="small muted">${esc(word)}</div>`;
 }
 function revCell(r) {
-  if (r.revision == null) return `<span class="muted small">Needs the FRED key</span>`;
+  if (r.revision == null) return `<span class="muted small">Not available</span>`;
   if (Math.abs(r.revision) < 0.5 * Math.pow(10, -r.dec)) return `<span class="muted small">No revision</span>`;
   const dd = r.dec + (r.unit === "%" ? 1 : 0); return `<div><b>${sg(r.revision, dd)}${r.unit === "%" ? " pp" : "k"}</b></div><div class="small muted">was ${nf(r.prev_first, dd)}${r.unit === "%" ? "%" : "k"}</div>`;
 }
@@ -786,15 +786,17 @@ function relCard(d) {
   POST.push(() => document.querySelectorAll("[data-fc]").forEach(el => el.addEventListener("change", () => {
     const v = el.value.trim(); if (v) FC[el.dataset.fc] = v; else delete FC[el.dataset.fc]; fcSave(); render(d);
   })));
-  const expCell = (r, auto, key) => auto != null ? `<div class="num"><b>${uStr(auto, r)}</b></div><div class="small muted">auto</div>` : inp(r, key);
+  const manual = (r, key) => toNum(FC[r.id + "|" + key]);
+  const expCell = (r, auto, key) => auto != null ? `<div class="num"><b>${uStr(auto, r)}</b></div><div class="small muted">auto</div>` : manual(r, key) != null ? `<div class="num"><b>${uStr(manual(r, key), r)}</b></div><div class="small muted">typed</div>` : `<span class="muted small">Not captured</span>`;
   const groups = ["Jobs", "Inflation", "Spending"].map(g => {
     const rows = R.filter(r => r.group === g); if (!rows.length) return "";
     return `<div class="card" style="margin-bottom:14px"><div class="cardhead"><h3>${g}</h3><span class="muted small">Latest release, and the next one</span></div><div class="scroll"><table class="rel"><tr><th style="text-align:left">Release</th><th>Previous</th><th>Expected</th><th>Actual</th><th>Surprise</th><th>Previous revised</th><th>Next release</th></tr>
-      ${rows.map(r => `<tr><td style="text-align:left"><b>${esc(r.label)}</b><div class="small muted">${esc(perLab(r))}</div></td><td class="num">${uStr(r.prev, r)}</td><td>${expCell(r, r.expected, r.period)}</td><td class="num"><b>${uStr(r.actual, r)}</b></td><td>${surpriseCell(r, r.expected != null ? r.expected : toNum(FC[r.id + "|" + r.period]))}</td><td>${revCell(r)}</td>
-        <td>${r.next_date ? `<div class="small"><b>${fmtDay(r.next_date)}</b></div>` : `<div class="small muted">Date not in calendar</div>`}${r.next_expected != null ? `<div class="small">Expected <b>${uStr(r.next_expected, r)}</b></div>` : `${inp(r, r.next_period)}<div class="small muted">expected</div>`}</td></tr>`).join("")}</table></div></div>`;
+      ${rows.map(r => `<tr><td style="text-align:left"><b>${esc(r.label)}</b><div class="small muted">${esc(perLab(r))}</div></td><td class="num">${uStr(r.prev, r)}</td><td>${expCell(r, r.expected, r.period)}</td><td class="num"><b>${uStr(r.actual, r)}</b></td><td>${surpriseCell(r, r.expected != null ? r.expected : manual(r, r.period))}</td><td>${revCell(r)}</td>
+        <td>${r.next_date ? `<div class="small"><b>${fmtDay(r.next_date)}</b></div>` : `<div class="small muted">Date not in calendar</div>`}${r.next_expected != null ? `<div class="small">Expected <b>${uStr(r.next_expected, r)}</b></div>` : manual(r, r.next_period) != null ? `<div class="small">Expected <b>${uStr(manual(r, r.next_period), r)}</b> (typed)</div>` : `<div class="small muted">Expected number appears in release week</div>`}</td></tr>`).join("")}</table></div></div>`;
   }).join("");
-  return `<section class="block">${secHead("Release scoreboard", "What came out, what was expected, and how big the surprise was. The surprise matters more than the number.")}${groups}
-    <p class="muted small" style="margin:-4px 0 14px;max-width:80ch">Expected numbers (consensus) are collected automatically each week from a free public calendar feed and kept for the surprise calculation. This feed is unofficial, so it can miss a release. If a box is empty, you can type the number yourself. Actual, previous and revisions come from FRED and appear after the next data update, usually within a few hours of the release. Surprise is actual minus expected. A revision is how much last month's number changed after it was first reported.</p></section>`;
+  const typed = `<details class="tbl" style="margin-bottom:14px"><summary>Optional: type an expected number yourself</summary><div class="scroll"><table class="rel"><tr><th style="text-align:left">Release</th><th>Last release</th><th>Next release</th></tr>${R.map(r => `<tr><td style="text-align:left">${esc(r.label)}</td><td>${inp(r, r.period)}</td><td>${inp(r, r.next_period)}</td></tr>`).join("")}</table></div></details>`;
+  return `<section class="block">${secHead("Release scoreboard", "What came out, what was expected, and how big the surprise was. The surprise matters more than the number.")}${groups}${typed}
+    <p class="muted small" style="margin:-4px 0 14px;max-width:80ch">Expected numbers (consensus) are collected automatically each week from a free public calendar feed and kept for the surprise calculation. This feed is unofficial, so it can miss a release. Numbers can only be captured for releases that happen after the dashboard starts collecting, so older releases show Not captured. You never have to type, but the optional box above lets you. Actual, previous and revisions come from FRED and appear after the next data update, usually within a few hours of the release. Surprise is actual minus expected. A revision is how much last month's number changed after it was first reported.</p></section>`;
 }
 
 function viewCalendar(d) {
