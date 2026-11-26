@@ -25,6 +25,9 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import extras  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG = ROOT / "config.json"
 OUT = ROOT / "docs" / "data.json"
@@ -211,6 +214,7 @@ def load_demo(cfg, scenario="calm"):
         put(k, M, out)
     put("unrate", M, path(48, [(0, 3.9), (1, 4.2)], .03, rnd))
     put("sahm", M, path(48, [(0, .05), (1, E(.2, .43))], .02, rnd))
+    extras.demo_raw(raw, cfg, S, path, bdays, weekly, monthly, rnd)
     return raw, [f"Demo mode ({scenario}): all numbers are synthetic."]
 
 
@@ -873,14 +877,20 @@ def main():
     post = posture(regime, triggers, vol)
     tiles = build_tiles(raw, vals, rates, wti_s, dxy_s)
 
+    S = a.demo == "stress"
+    ex = extras.build_all(raw, cfg, TODAY, http_get, errors, bool(a.demo), S, cal_path=str(ROOT / "calendar.json"),
+                          cot_demo_rnd=random.Random(11))
     latest = max((s[-1][0] for k, s in raw.items() if k in ("dgs10", "hy", "vix", "dxy") and s), default=TODAY.isoformat())
     out = {
         "meta": {"mode": "demo" if a.demo else "live", "generated_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
                  "as_of": latest, "errors": errors, "series_loaded": len(raw)},
         "posture": post, "regime": regime, "triggers": triggers, "tiles": tiles, "four_market": fm,
         "instruments": instruments, "pairs": pairs, "rates": rates, "credit": credit, "vol": vol,
-        "energy": energy, "dollar": dollar,
+        "energy": energy, "dollar": dollar, **ex,
     }
+    out["tag"] = extras.daily_tag(latest, post, regime, vol, rates, fm=fm, credit=credit)
+    out["history"] = (extras.demo_history(raw, post["level"], regime, S) if a.demo else extras.load_history(HIST))
+    out["version"] = 2
     outp = Path(a.out)
     outp.parent.mkdir(parents=True, exist_ok=True)
     outp.write_text(json.dumps(out, separators=(",", ":"), allow_nan=False))
@@ -890,7 +900,11 @@ def main():
         append_history({"date": latest, "posture": post["level"], "regime_avg": regime and regime["avg"],
                         "regime": regime and regime["label"], "vix": vals["vix"], "hy_bp": vals["hy_bp"],
                         "us10y": vals["dgs10"], "wti": vals["wti"], "dxy": vals["dxy"],
-                        "alerts": post["counts"]["alert"], "watches": post["counts"]["watch"]})
+                        "alerts": post["counts"]["alert"], "watches": post["counts"]["watch"],
+                        "vix_state": vol and vol["state"], "rate_phase": rates["cycle"]["phase"] if rates.get("cycle") else None,
+                        "four_market": fm and fm["verdict"], "tag": out["tag"]})
+        pub = ROOT / "docs" / "history.csv"
+        pub.write_text(HIST.read_text())
 
 
 if __name__ == "__main__":
