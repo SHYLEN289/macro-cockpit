@@ -1,0 +1,167 @@
+{
+ "_note": "Edit freely. FOMC, CPI, jobs and PPI dates are from the Fed and BLS schedules (checked Nov 2026). Add anything else under extra. Dates in retail_sales_approx and pce_approx are estimates.",
+ "fomc": [
+  {
+   "start": "2026-12-08",
+   "end": "2026-12-09",
+   "sep": true
+  },
+  {
+   "start": "2027-01-26",
+   "end": "2027-01-27"
+  },
+  {
+   "start": "2027-03-16",
+   "end": "2027-03-17"
+  },
+  {
+   "start": "2027-04-27",
+   "end": "2027-04-28"
+  },
+  {
+   "start": "2027-06-08",
+   "end": "2027-06-09"
+  },
+  {
+   "start": "2027-07-27",
+   "end": "2027-07-28"
+  },
+  {
+   "start": "2027-09-14",
+   "end": "2027-09-15"
+  },
+  {
+   "start": "2027-10-26",
+   "end": "2027-10-27",
+   "decision": false
+  },
+  {
+   "start": "2027-11-16",
+   "end": "2027-11-17"
+  }
+ ],
+ "cpi": [
+  "2026-12-10",
+  "2027-01-13",
+  "2027-02-11",
+  "2027-03-10",
+  "2027-04-13",
+  "2027-05-12",
+  "2027-06-10",
+  "2027-07-14",
+  "2027-08-11",
+  "2027-09-14",
+  "2027-10-14",
+  "2027-11-10",
+  "2027-12-10"
+ ],
+ "nfp": [
+  "2026-12-04",
+  "2027-01-08",
+  "2027-02-05",
+  "2027-03-05",
+  "2027-04-02",
+  "2027-05-07",
+  "2027-06-04",
+  "2027-07-02",
+  "2027-08-06",
+  "2027-09-03",
+  "2027-10-08",
+  "2027-11-05",
+  "2027-12-03"
+ ],
+ "ppi": [
+  "2027-01-14",
+  "2027-02-12",
+  "2027-03-12",
+  "2027-05-13",
+  "2027-06-15",
+  "2027-07-15"
+ ],
+ "retail_sales_approx": [
+  "2026-12-16",
+  "2027-01-15",
+  "2027-02-16",
+  "2027-03-16",
+  "2027-04-15"
+ ],
+ "pce_approx": [
+  "2026-12-23",
+  "2027-01-29",
+  "2027-02-26",
+  "2027-03-26"
+ ],
+ "holidays": [
+  {
+   "date": "2026-11-26",
+   "name": "Thanksgiving",
+   "close": "full"
+  },
+  {
+   "date": "2026-11-27",
+   "name": "day after Thanksgiving",
+   "close": "early"
+  },
+  {
+   "date": "2026-12-24",
+   "name": "Christmas Eve",
+   "close": "early"
+  },
+  {
+   "date": "2026-12-25",
+   "name": "Christmas",
+   "close": "full"
+  },
+  {
+   "date": "2027-01-01",
+   "name": "New Year's Day",
+   "close": "full"
+  },
+  {
+   "date": "2027-01-18",
+   "name": "Martin Luther King Jr. Day",
+   "close": "full"
+  },
+  {
+   "date": "2027-02-15",
+   "name": "Presidents Day",
+   "close": "full"
+  },
+  {
+   "date": "2027-03-26",
+   "name": "Good Friday",
+   "close": "full"
+  },
+  {
+   "date": "2027-05-31",
+   "name": "Memorial Day",
+   "close": "full"
+  },
+  {
+   "date": "2027-06-18",
+   "name": "Juneteenth (observed)",
+   "close": "full"
+  },
+  {
+   "date": "2027-07-05",
+   "name": "Independence Day (observed)",
+   "close": "full"
+  },
+  {
+   "date": "2027-09-06",
+   "name": "Labor Day",
+   "close": "full"
+  },
+  {
+   "date": "2027-11-25",
+   "name": "Thanksgiving",
+   "close": "full"
+  },
+  {
+   "date": "2027-11-26",
+   "name": "day after Thanksgiving",
+   "close": "early"
+  }
+ ],
+ "extra": []
+}
