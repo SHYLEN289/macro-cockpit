@@ -200,6 +200,7 @@ footer summary { cursor: pointer; }
 .how { margin: -6px 0 14px; font-size: 13.5px; max-width: 70ch; }
 .how summary { cursor: pointer; color: var(--s1); font-weight: 600; width: fit-content; }
 .how dl { margin: 8px 0 0; padding: 10px 14px; border-left: 3px solid var(--s1); background: var(--wash); border-radius: 0 6px 6px 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; }
+.how .src { margin: 6px 0 0; font-size: 12.5px; color: var(--ink2); font-style: italic; }
 .how dt { font-weight: 600; } .how dd { margin: 0; color: var(--ink2); }
 @media (max-width: 600px) { .how dl { grid-template-columns: 1fr; gap: 0; } .how dd { margin-bottom: 8px; } }
 @media (max-width: 900px) { .g4 { grid-template-columns: 1fr 1fr; } .ev { grid-template-columns: 76px 1fr; } .ev .lt, .ev .ntag { grid-column: 2; } .ladder { grid-template-columns: 1fr 1fr; } }
@@ -315,28 +316,125 @@ function lineChart(el, cfg) {
 /* ---------- sections ---------- */
 function chipDelta(v, d = 2, unit = "") { return v == null ? "" : `<span class="d ${cls(v)}">${arrow(v)}${nf(Math.abs(v), d)}${unit}</span>`; }
 
+const G = "From the Delta Neutral indicator guide.";
 const HOW = {
-  "Your instruments": ["Every morning, first thing after the posture.", "Shows which way the macro backdrop leans for each market you trade. The lean is context, not a signal.", "Neutral is normal. A bearish lean means size smaller and be pickier on longs. It never tells you to enter or exit.", "Use it to set your size and how much to trust your levels. Entries still come from price and order flow."],
-  "Before the open": ["Every morning, before the open.", "The triggers are 9 fixed lines (10Y yield, HY spread, oil, VIX, CPI, dollar and others). The four-market check asks whether stocks, bonds, credit and the dollar agree.", "Most triggers should be OK. One alert means pay attention. Several at once, or the four markets disagreeing, means stress is building.", "If triggers are firing, reduce size and avoid selling premium. If everything is OK and the markets agree, trade your plan as normal."],
-  "Snapshot": ["Once, before the open.", "Key levels in one view: yields, curve, credit, VIX, dollar and oil.", "Look for anything that moved sharply overnight. Slow drift is normal.", "Note big overnight moves. Do not watch these during the day, because they change slowly."],
-  "Rates and the Fed": ["Once a day, in more detail on the weekend.", "Where the rate cycle is, how the yield curve looks, and how the 10Y and 2Y are moving.", "A positive curve and steady yields is normal. A curve that goes negative again after un-inverting, or a fast jump in the 10Y, is a warning.", "Rising yields hurt NQ more than ES. If yields are spiking, expect pressure on tech and be careful with long size."],
-  "Credit": ["Weekly, and a glance each morning.", "The high-yield spread shows how nervous lenders are. Credit moves slower than stocks and is usually right.", "Around 300 bp or less is calm, 450 bp is a concern, and the higher bands are stress. Watch whether it is widening or tightening this month.", "If credit and VIX disagree, believe credit. Widening credit with a calm VIX means the calm may be fragile."],
-  "Volatility": ["Every morning.", "The shape of the VIX curve and the volatility premium (implied minus realized).", "Contango (later months higher) is normal. Backwardation (near months higher) means real stress. A negative premium means the market is moving more than options priced.", "In backwardation, cut size and do not sell premium. In contango with a positive premium, conditions are normal."],
-  "Oil and the dollar": ["Weekly, plus when they move a lot.", "Outside pressure gauges. A strong dollar and a big oil move both tighten conditions.", "A dollar above 108 is a headwind. Oil moves of a few percent are normal. Sharp spikes or collapses matter.", "Treat them as background. They matter most when they move fast or sit near the trigger levels."],
-  "Labor": ["Weekly, on the weekend.", "Unemployment, the Sahm rule, jobless claims and payrolls show whether the job market is holding.", "A Sahm rule reading at or above 0.50 is a recession signal. Claims near their 52-week low is healthy. Claims climbing and payrolls slowing is softening.", "Bad jobs news matters when it is a trend, not a single week. Use it to decide how defensive to be."],
-  "Inflation": ["Weekly, and on CPI and PCE release days.", "Inflation versus its 3-month pace. The 3-month pace tells you where inflation is heading, and the yearly rate tells you where it has been.", "A 3-month pace above the yearly rate means inflation is heating up. Below means cooling. The Fed's target is 2%.", "Heating inflation means the Fed stays tight and yields stay high, which pressures NQ. Cooling inflation gives stocks room."],
-  "Liquidity": ["Weekly.", "Net liquidity is the Fed balance sheet minus Treasury cash minus reverse repo. It is the money available to chase assets.", "A change of $50 billion or more over 4 weeks counts as improving or tightening. Flat is normal.", "Improving liquidity is a tailwind for risk assets. Tightening is a headwind. It sets the tone, not the entry."],
-  "Correlations": ["Weekly.", "How stocks move relative to yields, VIX, credit, bonds, the dollar and oil, now versus the usual.", "Relationships near their usual values are normal. A break means the old relationship stopped working.", "Two or more breaks means the market is behaving unusually. Reduce size and do not sell premium until they settle."],
-  "Rotation": ["Weekly.", "Which sectors lead and lag, and whether that matches what the macro story predicts. It also shows risk-appetite ratios like small caps versus large.", "Matches means the market agrees with macro. Disagrees means trust the rotation, because money is the more honest signal.", "Leaders being defensive (utilities, staples) means caution. Cyclicals and tech leading means risk appetite is healthy."],
-  "Positioning": ["Weekly. The data is from the CFTC and lags by a few days.", "How crowded leveraged funds are in NQ and ES, on a 0 to 100 index.", "Between 10 and 90 is normal. Above 90 is a crowded long, below 10 is a crowded short.", "Crowded trades unwind fast. At an extreme, expect sharper reversals and do not chase."],
-  "Economic calendar": ["Sunday for the week, and a glance each morning.", "Releases by importance (Tier 1 is the biggest) and the Fed quiet period before each meeting.", "Tier 1 days (jobs report, CPI, Fed decision) are the ones that move markets. The quiet period means the Fed is not speaking.", "Trade smaller or stand aside around Tier 1 releases. Do not hold size through a surprise you cannot control."],
-  "Pre-market bias builder": ["Every morning, after reading the Today page.", "It builds your bias in four layers, from slow to fast, then writes it with an invalidation.", "If slow and fast layers are both calm, trust the map. If only the fast layers are stressed, it is probably a temporary scare. If both are stressed, size down.", "Type your gamma levels, tick the 9 AM boxes, read the bias, and save it. If price hits the invalidation, switch your view and do not argue with it."],
-  "History": ["When you want to review, for example on weekends.", "One row is saved each run, so you can see how long the market stayed in each posture.", "Long stretches of Normal are common. Short Critical bursts often come after Elevated build-ups.", "Use it to learn what the build-up to a bad week looked like, then compare to your journal."]
+  "Your instruments": [
+    "Pre-market, after you read the posture.",
+    "The macro lean for each market you trade. The guide stresses that the Nasdaq is rate-sensitive: a real-yield surge hits NQ before ES, and on a rates day NQ is expected to underperform ES.",
+    "Bearish lean means the rates story is in charge for that market. Neutral means macro is not the story. It is context, never an entry.",
+    "Use it to choose how much weight to give breakouts versus fades and how big to trade. Entries still come from price and levels.",
+    "The guide's idea: the regime tells you how much to trust your levels, not when to act.",
+    "Our own summary card, built on the guide's rate-sensitivity and regime tools. The lean wording is ours."],
+  "Before the open": [
+    "Pre-market. This is your daily checklist.",
+    "Regime Triggers: 9 lines with fixed thresholds. 10Y above 4.50% or below 4.00%, HY spread above 500 bp, oil above $110 or below $70, VIX above 30, CPI above 3.5% sustained, 2s10s below zero again, dollar above 108.",
+    "No triggers active: macro is not the story, trade positioning and levels. One active: a specific risk is live, so read that input's own tool. Several active: the regime is shifting, macro drives and you reduce size.",
+    "Any alert or crisis line changes how aggressive you should be. Then run the four-market check: if dollar strength and widening credit line up with negative gamma, that is conviction downside and institutional exit. If correlations break, reduce size and do not sell premium.",
+    "A trigger says the environment changed. It does not say what price does next.",
+    "From the guide: Regime Triggers Watchlist and Cross-Asset Confirmation."],
+  "Snapshot": [
+    "Once, before the open.",
+    "Four live numbers: Fed funds, the 10-year yield, high-yield spreads, and WTI oil. We add CPI, PCE, unemployment and the dollar.",
+    "10Y jumped overnight: rates are the story, NQ will feel it more than ES and data prints matter more. Spreads widened: the market is nervous, treat rallies with more suspicion. Everything flat: macro is not the story.",
+    "Ask which of the numbers is the day's story. Usually it is the one that moved most. Compare each with yesterday, then pair it with the economic calendar to see which release moves which number.",
+    "Do not keep watching these intraday. They change slowly and watching them invites overreaction. Levels matter less than changes and thresholds.",
+    "From the guide: Macro Snapshot."],
+  "Rates and the Fed": [
+    "Pre-market for the 2-year and 10-year moves. Weekly for the cycle, the curve trend and the spreads.",
+    "The yield curve, the rate cycle phase (hiking, peak, cutting, zero), real yields, and the 2s10s, 10s30s and 10y-3m spreads.",
+    "Short end moving most means policy expectations are changing. Long end moving most means growth, inflation or supply worries. Inverted means a recession risk window of months to years, never a timing signal. Real yields rising is a headwind for growth, and NQ feels it first. Re-steepening out of inversion is historically the dangerous part, because it usually comes from cuts.",
+    "Read the shape first, then compare with the week-ago and month-ago lines. In a hiking cycle every inflation print is a policy print. In a cutting cycle, why they cut matters more than how much. Weigh the direction of change more than the level.",
+    "Curve signals play out over months, not sessions. One day's move rarely changes the regime. Real yields and nominal yields can move for different reasons, so check breakevens too.",
+    "From the guide: Yield Curve, Yield Spreads, Treasury Yields Table, Rate Cycle Position, Real Yield Curve, Fed Funds Path."],
+  "Credit": [
+    "Pre-market for the band, weekly for band changes. The guide ranks credit as a must-read.",
+    "The HY spread on a 5-band scale: under 300 bp euphoria, 300 to 450 normal, 450 to 600 concern, 600 to 800 recession, over 800 crisis. Plus the six tiers from investment grade to CCC.",
+    "Normal: credit is not the constraint and dips get bought. Concern: stress is building, treat rallies with suspicion and tighten risk. Higher bands: dip-buying stops working and intraday ranges widen. Above 500 bp is an alert trigger. Stress that starts in CCC while IG holds is the early stage of a credit scare.",
+    "Credit moves before equities and is usually right. Widening spreads while equities hold up is the classic disagreement, so believe credit. When credit and the VIX curve both flash stress, believe them. A move from one band to another is the event.",
+    "Credit is slower than equities, so look for a trend over days. Euphoria is not a sell signal on its own: it means protection is cheap and complacency is high. CCC is volatile, so confirm it with the tiers above it.",
+    "From the guide: Credit Spreads, HY OAS Thermometer, Credit Tier Sparklines."],
+  "Volatility": [
+    "Pre-market for the VIX curve shape and the premium. Weekly for the history and where today sits.",
+    "The VIX curve across tenors, and the volatility risk premium (implied minus realized) at 1 week, 1 month and 3 months.",
+    "Contango is the ordinary state, and short-volatility strategies earn. Backwardation is stress now: ranges widen. A bump at one tenor is an event priced into that date. A high positive premium means options are expensive. Near zero or negative at the front means the market is moving more than it priced.",
+    "Read the shape before the level, and compare front against back. A 1-week premium spike flags an event. The 1-month premium is the core signal, and 3 months shows the regime. A negative front premium is the one to notice. Confirm with credit spreads.",
+    "Brief inversions around events are normal and reverse quickly. Realized volatility looks backward, so a quiet week can make the premium look rich just before an event.",
+    "From the guide: VIX Term, VRP Term, VRP Cone, VRP History."],
+  "Oil and the dollar": [
+    "Weekly. Pre-market if either is near a trigger line.",
+    "WTI against the $70 and $110 thresholds, and the dollar index against 108.",
+    "Above $110 is a supply shock: inflationary and bad for growth, energy leads, consumer and growth stocks lag, rates rise. Below $70 is a demand collapse: a growth scare where energy and cyclicals lag and bonds rally. In between, oil is not driving the picture. A rising dollar is a headwind for emerging markets and multinationals and favours domestic small caps.",
+    "Treat the oil lists as a playbook, not a forecast. Check whether the sector heatmap behaves the way the playbook expects. Dollar strength together with negative gamma is conviction downside.",
+    "The $70 and $110 lines are judgment calls, not natural laws. Supply shocks and demand collapses both move price but mean opposite things, so check which one it is. Wednesday's inventory report brings a burst of energy volatility.",
+    "From the guide: Oil Shock vs Collapse, WTI Price Levels, Energy Prices, EIA Inventory, Regime Triggers, Macro Rotation Guide."],
+  "Labor": [
+    "Weekly. Payrolls Friday brings event-driven volatility and a vol crush after the release.",
+    "Payrolls, unemployment, jobless claims and job openings. We also show the Sahm rule.",
+    "Strong data in a hiking cycle is bad news for rates, and equities can fall on good data. Unemployment rising steadily means the labor market is loosening, the data that turns a soft landing into a hard one. Claims spiking is the fastest-moving signal, and a sustained rise is worth taking seriously.",
+    "Read payrolls against expectations, then check revisions. Use unemployment and claims for the trend rather than one print. Openings and quits show whether the market is tight or loosening. Always read it with the rate cycle to know whether strong data is good or bad for stocks today.",
+    "Payrolls are revised heavily, and claims give a faster read.",
+    "From the guide: Labor Market. The Sahm rule box is our addition and not in the guide."],
+  "Inflation": [
+    "Weekly, and on CPI days. The guide ranks it as a tool that changes decisions.",
+    "Headline, core and sticky inflation, plus the median and trimmed-mean measures, across CPI and PCE. We add the 3-month pace.",
+    "Core above expectations is hawkish: rates up, growth stocks down, and the 8:30 move often extends through the open. Core below expectations is relief, so watch whether the open accepts the gap or fades it. Headline and core diverging is usually energy or food, and the market cares about core.",
+    "Read core before headline. Use sticky and trimmed-mean to see whether inflation is broad or concentrated. Compare the print with the consensus, not with last month. The surprise matters more than the number. In a hiking cycle a print can own the whole session. On CPI days, implied volatility kinks build into the print and collapse after.",
+    "Headline swings with energy, so the core measures carry the signal.",
+    "From the guide: CPI / PCE Inflation. The 3-month pace is our addition."],
+  "Liquidity": [
+    "Weekly.",
+    "Net liquidity is the Fed balance sheet minus Treasury cash minus reverse repo.",
+    "The guide treats funding plumbing separately: the effective Fed funds rate should sit inside its target band. If it drifts to the top of the band, funding is getting tight, historically a precursor to events and to the Fed stepping in.",
+    "Use the Fed funds path around FOMC meetings and when the market starts talking about liquidity or the balance sheet. Our net-liquidity number is a trend gauge: improving is a tailwind and tightening is a headwind.",
+    "Plumbing is important when it breaks and silent otherwise. Moves are rare and scheduled, so the information is in expectations.",
+    "Partly from the guide: Fed Funds Path covers the plumbing. Net liquidity itself is our addition."],
+  "Correlations": [
+    "Weekly. The guide says it is worth checking daily too.",
+    "How stocks, bonds, credit, the dollar and oil move together, now compared with their usual behavior.",
+    "A long-standing correlation breaking means the regime is changing, and strategies that relied on the old link stop working. Correlations strengthening across pairs means everything moves as one, usually stress. Stocks and bonds moving together means inflation, not growth, is the worry and hedges stop working.",
+    "Read equities against yields first, since that is the regime tell. Look for pairs that recently flipped sign, and focus on pairs with a mechanical reason to be linked. A correlation breakdown means reduce size and do not sell premium.",
+    "The number matters less than whether it changed. Thirty days is a short window and correlation is not causation. The guide uses a 30-day window. We compare the last 60 days with the last 250.",
+    "From the guide: Pair Correlations, Cross-Asset Correlations, Cross-Asset Confirmation."],
+  "Rotation": [
+    "Weekly. At the close, check which sectors led today.",
+    "Sector returns over several horizons, which sectors lead, and the factor ratios (small versus large, growth versus value, momentum).",
+    "Leadership matching the macro environment means the regime read is probably right. Contradicting it means the environment is about to change or something else is driving markets, and the disagreement is the more useful information. Cyclicals leading is a growth-friendly, risk-on market. Defensives leading means money is seeking safety even if the index looks calm. Tech lagging on a rates day means NQ underperforms ES.",
+    "Find the active environment first: rates rising, rates falling, credit widening, credit tightening, oil spike, dollar rising. Then compare its buy and sell lists with the sector table. Momentum reversing sharply means a crowded unwind. Value beating growth usually means rates rising.",
+    "Environments overlap, so weigh the strongest signal. Short-horizon leadership flips often, and momentum is backward-looking.",
+    "From the guide: Macro Rotation Guide, Sector Heatmap, Sector Momentum Wheel, Factor Returns, Rates Sector Sensitivity."],
+  "Positioning": [
+    "Weekly.",
+    "How crowded leveraged funds are in NQ and ES, from CFTC data, on a 0 to 100 index.",
+    "Above 90 is a crowded long and below 10 is a crowded short.",
+    "Crowded trades unwind fast, so do not chase at an extreme.",
+    "The data lags by a few days.",
+    "This is our addition. It is not in the guide."],
+  "Economic calendar": [
+    "Sunday for the week, and a glance each morning.",
+    "Releases ranked by importance (Tier 1 is biggest) and the Fed quiet period.",
+    "The guide points to specific days: payrolls Friday (event volatility, then a vol crush), CPI days (implied volatility builds into the print and collapses after), and the Wednesday inventory report (an energy volatility burst). The rate cycle tells you which events matter this month.",
+    "Pair the calendar with the Macro Snapshot to know which number a release is likely to move. In a hiking cycle, treat data days as the days that own the session.",
+    "A release creates a burst of movement. It does not tell you the direction.",
+    "Partly from the guide's day-by-day notes. The Tier ranking and the Fed quiet period are our additions."],
+  "Pre-market bias builder": [
+    "Every morning, after reading the Today page.",
+    "It stacks the four layers (monthly, weekly, nightly, 9 AM), then adds the options map you type in.",
+    "The guide's key combination: macro stress together with negative gamma is the dangerous one, because dealer hedging amplifies the stress and that is where the violent days come from. Macro stress with positive gamma is dampened, so moves are more contained than the macro picture suggests.",
+    "Check whether any macro stress signal lines up with negative gamma, and be most defensive when it does. Alignment is the warning, not any single signal. Write the bias with its invalidation, and use it to choose a playbook for the day, never to time an entry.",
+    "A bias is a starting point. If the invalidation hits, switch and do not argue.",
+    "The macro-stress-plus-gamma rule is from the guide (Cross-Asset Confirmation). The four-layer builder follows the lessons and is not in this guide."],
+  "History": [
+    "Whenever you review, for example on weekends.",
+    "One row per run: posture, regime score, VIX, HY spread, 10Y yield.",
+    "It shows how long the market stayed in each posture. The guide says a composite regime score moves slowly and frames the week more than a single session.",
+    "Compare the regime score with last week, not with zero. A score falling fast matters more than one sitting still at a high number.",
+    "This is a record of what the dashboard said, not a forecast.",
+    "Our addition. It is not in the guide."]
 };
-const HOWL = ["When to check", "What it shows", "What to expect", "What to do"];
+const HOWL = ["When to use it", "What to look at", "What each state means", "How to read it and what to do", "Watch out for", "Source"];
 function howBlock(t) {
   const h = HOW[t]; if (!h) return "";
-  return `<details class="how"><summary>How to use this</summary><dl>${h.map((x, i) => `<dt>${HOWL[i]}</dt><dd>${esc(x)}</dd>`).join("")}</dl></details>`;
+  return `<details class="how"><summary>How to use this</summary><dl>${h.slice(0, 4).map((x, i) => `<dt>${HOWL[i]}</dt><dd>${esc(x)}</dd>`).join("")}</dl>${h[4] ? `<p class="src">${esc(h[4])}</p>` : ""}</details>`;
 }
 function secHead(title, sub) { return `<div class="sec-head"><h2>${esc(title)}</h2></div><p class="sec-sub">${esc(sub)}</p>${howBlock(title)}`; }
 
