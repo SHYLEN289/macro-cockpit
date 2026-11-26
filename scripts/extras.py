@@ -487,11 +487,18 @@ REL = [
 
 
 def fetch_initial(sid, api_key, http_get, start):
-    """First-reported values for a FRED series (needs the API key)."""
+    """First-reported values: take every vintage and keep the earliest one for each date."""
     q = urllib.parse.urlencode({"series_id": sid, "api_key": api_key, "file_type": "json", "observation_start": start,
-                                "output_type": 4, "realtime_start": "1776-07-04", "realtime_end": "9999-12-31"})
+                                "realtime_start": "1776-07-04", "realtime_end": "9999-12-31", "limit": 100000})
     data = json.loads(http_get("https://api.stlouisfed.org/fred/series/observations?" + q))
-    return {o["date"]: float(o["value"]) for o in data["observations"] if o["value"] not in (".", "")}
+    best = {}
+    for o in data["observations"]:
+        if o["value"] in (".", ""):
+            continue
+        d, rs = o["date"], o["realtime_start"]
+        if d not in best or rs < best[d][0]:
+            best[d] = (rs, float(o["value"]))
+    return {d: v for d, (rs, v) in best.items()}
 
 
 def fetch_initials(cfg, today, http_get, errors, api_key):
@@ -551,6 +558,8 @@ def fetch_consensus(http_get, errors):
                 if str(it.get("country", "")).upper() == "USD":
                     items.append(it)
         except Exception as e:  # noqa: BLE001
+            if "404" in str(e) and "nextweek" in u:
+                continue  # next week's file is only published late in the week
             errors.append(f"Expected numbers ({u.rsplit('/', 1)[-1]}): {str(e)[:80]}")
     return items
 
