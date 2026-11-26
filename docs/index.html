@@ -203,6 +203,8 @@ footer summary { cursor: pointer; }
 .how .src { margin: 6px 0 0; font-size: 12.5px; color: var(--ink2); font-style: italic; }
 .how dt { font-weight: 600; } .how dd { margin: 0; color: var(--ink2); }
 @media (max-width: 600px) { .how dl { grid-template-columns: 1fr; gap: 0; } .how dd { margin-bottom: 8px; } }
+.fcin { width: 76px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--card, transparent); color: inherit; font: inherit; font-variant-numeric: tabular-nums; }
+table.rel td, table.rel th { vertical-align: top; text-align: left; } table.rel td .ic { vertical-align: -2px; }
 @media (max-width: 900px) { .g4 { grid-template-columns: 1fr 1fr; } .ev { grid-template-columns: 76px 1fr; } .ev .lt, .ev .ntag { grid-column: 2; } .ladder { grid-template-columns: 1fr 1fr; } }
 
 @media (max-width: 900px) {
@@ -410,12 +412,12 @@ const HOW = {
     "The data lags by a few days.",
     "This is our addition. It is not in the guide."],
   "Economic calendar": [
-    "Sunday for the week, and a glance each morning.",
-    "Releases ranked by importance (Tier 1 is biggest) and the Fed quiet period.",
-    "The guide points to specific days: payrolls Friday (event volatility, then a vol crush), CPI days (implied volatility builds into the print and collapses after), and the Wednesday inventory report (an energy volatility burst). The rate cycle tells you which events matter this month.",
-    "Pair the calendar with the Macro Snapshot to know which number a release is likely to move. In a hiking cycle, treat data days as the days that own the session.",
-    "A release creates a burst of movement. It does not tell you the direction.",
-    "Partly from the guide's day-by-day notes. The Tier ranking and the Fed quiet period are our additions."],
+    "Sunday for the week, and a glance each morning. Payrolls Friday, CPI days and the Wednesday inventory report are the guide's key days.",
+    "Release dates by importance (Tier 1 is biggest), plus the release scoreboard: previous, expected, actual, surprise and revision for jobs, inflation and spending.",
+    "The guide says the number itself matters less than the surprise. Core above expectations is hawkish: rates up, growth stocks down, and the 8:30 move often extends through the open. Core below is relief, so watch whether the open accepts the gap or fades it. Headline and core diverging is usually energy or food, and the market cares about core.",
+    "The expected numbers fill in by themselves from a free calendar feed. After the release, read the surprise first, then the revision. Compare the print with what was expected, not with last month. Read core before headline. In a hiking cycle a print can own the whole session. On CPI days implied volatility builds into the print and collapses after. A rate cycle tells you which events matter this month.",
+    "A release creates a burst of movement but not a direction. Payrolls are revised heavily, so check last month's revision. The expected numbers come from an unofficial free feed, not an official source, so double-check the big ones.",
+    "The guide covers the surprise logic and key days. The scoreboard, the Tier ranking and the Fed quiet period are our additions."],
   "Pre-market bias builder": [
     "Every morning, after reading the Today page.",
     "It stacks the four layers (monthly, weekly, nightly, 9 AM), then adds the options map you type in.",
@@ -760,6 +762,41 @@ function viewWeekly(d) {
 }
 
 /* ---------- calendar view ---------- */
+/* ---------- release scoreboard ---------- */
+const FKEY = "mc-fc-v1";
+const FC = (() => { try { return JSON.parse(localStorage.getItem(FKEY)) || {}; } catch (e) { return {}; } })();
+const fcSave = () => { try { localStorage.setItem(FKEY, JSON.stringify(FC)); } catch (e) { /* ignore */ } };
+const perLab = r => { const x = new Date(r.period + "T00:00:00Z"); return r.weekly ? "Week ending " + x.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : x.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" }); };
+const uStr = (v, r) => v == null ? "n/a" : nf(v, r.dec) + (r.unit === "%" ? "%" : "k");
+const toNum = v => { const n = parseFloat(String(v == null ? "" : v).replace(/[%k,\s]/gi, "")); return isNaN(n) ? null : n; };
+function surpriseCell(r, exp) {
+  if (exp == null || r.actual == null) return `<span class="muted small">Expected number not available yet</span>`;
+  const a = +r.actual.toFixed(r.dec), s = a - exp, mag = Math.abs(s) / r.inline;
+  const word = mag < 1 ? "In line" : s > 0 ? r.up : r.dn, ic = mag < 1 ? ICON.neutral : mag < 2 ? ICON.watch : ICON.alert;
+  return `<div>${ic} <b>${sg(s, r.dec)}${r.unit === "%" ? " pp" : "k"}</b></div><div class="small muted">${esc(word)}</div>`;
+}
+function revCell(r) {
+  if (r.revision == null) return `<span class="muted small">Needs the FRED key</span>`;
+  if (Math.abs(r.revision) < 0.5 * Math.pow(10, -r.dec)) return `<span class="muted small">No revision</span>`;
+  const dd = r.dec + (r.unit === "%" ? 1 : 0); return `<div><b>${sg(r.revision, dd)}${r.unit === "%" ? " pp" : "k"}</b></div><div class="small muted">was ${nf(r.prev_first, dd)}${r.unit === "%" ? "%" : "k"}</div>`;
+}
+function relCard(d) {
+  const R = d.releases || []; if (!R.length) return "";
+  const inp = (r, key) => `<input class="fcin" type="text" inputmode="decimal" data-fc="${esc(r.id + "|" + key)}" value="${esc(FC[r.id + "|" + key] || "")}" placeholder="${r.unit === "%" ? "e.g. 3.1" : "e.g. 150"}" aria-label="Expected ${esc(r.label)}">`;
+  POST.push(() => document.querySelectorAll("[data-fc]").forEach(el => el.addEventListener("change", () => {
+    const v = el.value.trim(); if (v) FC[el.dataset.fc] = v; else delete FC[el.dataset.fc]; fcSave(); render(d);
+  })));
+  const expCell = (r, auto, key) => auto != null ? `<div class="num"><b>${uStr(auto, r)}</b></div><div class="small muted">auto</div>` : inp(r, key);
+  const groups = ["Jobs", "Inflation", "Spending"].map(g => {
+    const rows = R.filter(r => r.group === g); if (!rows.length) return "";
+    return `<div class="card" style="margin-bottom:14px"><div class="cardhead"><h3>${g}</h3><span class="muted small">Latest release, and the next one</span></div><div class="scroll"><table class="rel"><tr><th style="text-align:left">Release</th><th>Previous</th><th>Expected</th><th>Actual</th><th>Surprise</th><th>Previous revised</th><th>Next release</th></tr>
+      ${rows.map(r => `<tr><td style="text-align:left"><b>${esc(r.label)}</b><div class="small muted">${esc(perLab(r))}</div></td><td class="num">${uStr(r.prev, r)}</td><td>${expCell(r, r.expected, r.period)}</td><td class="num"><b>${uStr(r.actual, r)}</b></td><td>${surpriseCell(r, r.expected != null ? r.expected : toNum(FC[r.id + "|" + r.period]))}</td><td>${revCell(r)}</td>
+        <td>${r.next_date ? `<div class="small"><b>${fmtDay(r.next_date)}</b></div>` : `<div class="small muted">Date not in calendar</div>`}${r.next_expected != null ? `<div class="small">Expected <b>${uStr(r.next_expected, r)}</b></div>` : `${inp(r, r.next_period)}<div class="small muted">expected</div>`}</td></tr>`).join("")}</table></div></div>`;
+  }).join("");
+  return `<section class="block">${secHead("Release scoreboard", "What came out, what was expected, and how big the surprise was. The surprise matters more than the number.")}${groups}
+    <p class="muted small" style="margin:-4px 0 14px;max-width:80ch">Expected numbers (consensus) are collected automatically each week from a free public calendar feed and kept for the surprise calculation. This feed is unofficial, so it can miss a release. If a box is empty, you can type the number yourself. Actual, previous and revisions come from FRED and appear after the next data update, usually within a few hours of the release. Surprise is actual minus expected. A revision is how much last month's number changed after it was first reported.</p></section>`;
+}
+
 function viewCalendar(d) {
   const c = d.calendar; if (!c) return `<div class="card"><p>No calendar loaded. Make sure calendar.json is in the repo root.</p></div>`;
   const t = etToday(), b = c.blackout;
@@ -777,7 +814,7 @@ function viewCalendar(d) {
       <div class="lt num">${e.time ? esc(e.time) + " ET<br>" + esc(etLocal(e.date, e.time)) + " your time" : ""}</div></div>`).join("")}</div>`).join("");
   const prep = `<div class="card"><div class="cardhead"><h3>Before a Tier 1 release</h3></div>
     <div class="rows">${["Write down the exact time. People still get caught holding a position at 8:30 by accident.", "Write the consensus, and what a hot or cool number would mean for the current story.", "Note which side is crowded. The surprise against the crowd causes the bigger move.", "Mark where the range is. The release usually tests one side of it.", "No new positions in the last minutes before the number. Spreads widen and the book thins.", "Trade smaller. The first move can be two or three times a normal move, and the first spike often fades."].map(x => `<div class="row"><span></span><div class="small">${esc(x)}</div><span></span></div>`).join("")}</div></div>`;
-  return `${secHead("Economic calendar", "Tier 1 can change the story. Tier 2 confirms or dents it. Tier 3 is context, unless it lands on the current story.")}${blk}
+  return `${secHead("Economic calendar", "Tier 1 can change the story. Tier 2 confirms or dents it. Tier 3 is context, unless it lands on the current story.")}${blk}${relCard(d)}
     <div class="grid g2" style="align-items:start"><div>${wk}</div><div>${prep}${note(c.note)}${note("Whatever the story is about, the data for that story gets promoted a tier.")}</div></div>`;
 }
 
@@ -1065,7 +1102,7 @@ function render(d) {
   html += view === "weekly" ? viewWeekly(d) : view === "calendar" ? viewCalendar(d) : view === "bias" ? viewBias(d) : view === "history" ? viewHistory(d) : viewToday(d);
   html += `<footer><p>Context, not entries. The regime tells you how much to trust your levels and how big to trade. Price and order flow tell you when to act.</p>
     <details><summary>Data notes${m.errors.length ? ` (${m.errors.length})` : ""}</summary><div style="padding-top:8px">
-      <p>Sources: FRED for yields, credit, jobs, inflation, the Fed balance sheet and Treasury cash. Yahoo Finance for VIX, dollar, oil, sector funds and futures prices. CFTC for positioning. Fed funds futures are not free, so cuts priced is a proxy. Gamma levels are not free either, so you type them into the Bias builder. Some calendar dates (retail sales, PCE) are approximate. Check the official schedule.</p>
+      <p>Sources: FRED for yields, credit, jobs, inflation, the Fed balance sheet and Treasury cash. Yahoo Finance for VIX, dollar, oil, sector funds and futures prices. CFTC for positioning. Expected numbers for releases from a free public calendar feed (unofficial). Fed funds futures are not free, so cuts priced is a proxy. Gamma levels are not free either, so you type them into the Bias builder. Some calendar dates (retail sales, PCE) are approximate. Check the official schedule.</p>
       ${m.errors.length ? `<ul>${m.errors.map(e => `<li>${esc(e)}</li>`).join("")}</ul>` : "<p>All series loaded.</p>"}</div></details></footer>`;
   $("#app").innerHTML = html;
   initTheme();
