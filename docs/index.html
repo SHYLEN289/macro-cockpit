@@ -209,6 +209,11 @@ table.rel td, table.rel th { vertical-align: top; text-align: left; } table.rel 
 .stage div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 6px; font-size: 12.5px; text-align: center; background: var(--wash); opacity: .55; }
 .stage div.on { opacity: 1; background: var(--surf); border-color: var(--ink); }
 
+
+/* plain-words summary */
+.now { border: 1px solid var(--line); border-left: 4px solid var(--axis); background: var(--surf); border-radius: 10px; padding: 10px 14px; margin: 0 0 12px; font-size: 14px; }
+.now b.t { display: block; font-size: 12.5px; color: var(--ink2); font-weight: 600; margin-bottom: 4px; }
+.now ul { margin: 0; padding-left: 18px; } .now li { margin: 3px 0; }
 /* news */
 .nws { display: grid; gap: 12px; }
 .nitem { background: var(--surf); border: 1px solid var(--line); border-left: 4px solid var(--axis); border-radius: 10px; padding: 14px 16px; }
@@ -462,7 +467,62 @@ function howBlock(t) {
   const h = HOW[t]; if (!h) return "";
   return `<details class="how"><summary>How to use this</summary><dl>${h.slice(0, 4).map((x, i) => `<dt>${HOWL[i]}</dt><dd>${esc(x)}</dd>`).join("")}</dl>${h[4] ? `<p class="src">${esc(h[4])}</p>` : ""}</details>`;
 }
-function secHead(title, sub) { return `<div class="sec-head"><h2>${esc(title)}</h2></div><p class="sec-sub">${esc(sub)}</p>${howBlock(title)}`; }
+
+const f1 = (x, n = 1) => (x == null || isNaN(x)) ? "n/a" : Number(x).toFixed(n);
+const sgn = x => (x > 0 ? "+" : "") + f1(x, 2);
+const SUMM = {
+  "Rates and the Fed": d => { const r = d.rates, o = []; if (!r) return o;
+    o.push(`Fed funds sit at ${f1(r.fed.lo, 2)} to ${f1(r.fed.hi, 2)}%. The Fed is in a ${String(r.cycle.phase).toLowerCase()} phase${r.cycle.last_change ? `, last move ${r.cycle.last_change.bp > 0 ? "+" : ""}${r.cycle.last_change.bp} bp on ${r.cycle.last_change.date}` : ""}.`);
+    const sp = r.spreads && r.spreads.s2s10s; if (sp) o.push(`2s10s is ${f1(sp.bp, 0)} bp, ${sp.bp < 0 ? "inverted, which means the bond market expects trouble or cuts" : "positive, a normal curve"}. The curve move is "${r.move}".`);
+    if (r.real) o.push(`Real 10Y yield is ${f1(r.real.real, 2)}%. Higher real yields press on NQ more than ES.`);
+    if (r.priced_cuts) o.push(`Roughly ${f1(r.priced_cuts.value, 1)} cuts are priced over the next year (a proxy, not futures data).`); return o; },
+  "Credit": d => { const c = d.credit, o = []; if (!c) return o;
+    o.push(`High-yield spread is ${c.bp} bp, band: ${c.band}. ${c.action}`);
+    o.push(`It moved ${sgn(c.d5_bp)} bp in 5 days and ${sgn(c.mo_bp)} bp in a month, so credit is ${c.d5_bp > 15 ? "widening fast, which is a warning" : c.d5_bp < -15 ? "tightening fast, which is supportive" : "calm"}.`);
+    if (c.note) o.push(c.note); if (c.vs_vix) o.push(c.vs_vix); return o; },
+  "Volatility": d => { const v = d.vol, o = []; if (!v) return o;
+    o.push(`VIX is ${f1(v.vix)} (${v.level}). The curve is in ${v.state}, ${v.state === "contango" ? "which is the normal, calm shape" : "which means traders are paying up for protection right now"}.`);
+    if (v.vrp_read) o.push(v.vrp_read); if (v.vvix) o.push(`VVIX is ${f1(v.vvix)}. A jump here warns that VIX itself may spike.`); return o; },
+  "Oil and the dollar": d => { const e = d.energy, x = d.dollar, o = [];
+    if (e) o.push(`WTI oil is $${f1(e.wti)}, ${sgn(e.d5_pct)}% over 5 days. ${e.scenario && e.scenario !== "none" ? "A stress scenario is active: " + e.scenario + "." : "No oil stress scenario is active."}`);
+    if (x) o.push(`The dollar index is ${f1(x.dxy)}, ${sgn(x.d5_pct)}% over 5 days. ${x.above_108 ? "It is above 108, a stress level." : `It needs ${f1(x.to_108, 1)}% more to reach the 108 stress line.`}`); return o; },
+  "Labor": d => { const l = d.labor, o = []; if (!l) return o; o.push(l.read);
+    (l.tiles || []).slice(0, 4).forEach(t => o.push(`${t.label}: ${t.value}. ${t.sub}.`)); if ((l.flags || []).length) o.push("Flags: " + l.flags.join(", ") + "."); return o; },
+  "Inflation": d => { const i = d.inflation, o = []; if (!i) return o; o.push(i.read);
+    (i.tiles || []).slice(0, 4).forEach(t => o.push(`${t.label} ${t.value} (${t.sub}), trend ${t.trend}.`));
+    if (i.breakeven != null) o.push(`Market-implied inflation (breakeven) is ${f1(i.breakeven, 2)}%.`); return o; },
+  "Liquidity": d => { const q = d.liquidity, o = []; if (!q) return o; o.push(q.read);
+    o.push(`Net liquidity is $${f1(q.net_tn, 2)} trillion, ${(q.chg4_bn > 0 ? '+' : '') + f1(q.chg4_bn, 0)} bn over 4 weeks and ${(q.chg13_bn > 0 ? '+' : '') + f1(q.chg13_bn, 0)} bn over 13 weeks.`); return o; },
+  "Correlations": d => { const c = d.correlations, o = []; if (!c) return o; o.push(c.read);
+    (c.rows || []).filter(r => r.status !== "normal").slice(0, 3).forEach(r => o.push(`${r.label}: ${f1(r.now, 2)} now vs ${f1(r.base, 2)} normally.${r.note ? " " + r.note : ""}`));
+    if (!c.breaks) o.push("No broken relationships, so the usual cross-market reads still work."); return o; },
+  "Rotation": d => { const r = d.rotation, o = []; if (!r) return o;
+    o.push(`Leading: ${(r.leaders || []).join(", ")}. Lagging: ${(r.laggards || []).join(", ")}.`); o.push(r.read);
+    if (r.nq_es && r.nq_es.read) o.push(r.nq_es.read); return o; },
+  "Positioning": d => { const p = d.positioning, o = []; if (!p) return o;
+    ["NQ", "ES"].forEach(k => { const x = p[k]; if (!x) return; const i = x.lev_index;
+      o.push(`${k}: funds are at ${f1(i, 0)} on a 0 to 100 scale, ${i >= 90 ? "crowded long, so unwinds can be fast" : i <= 10 ? "crowded short, so squeezes are possible" : "not crowded either way"}.`); }); return o; },
+  "Release scoreboard": d => { const n = d.calendar && d.calendar.next_tier1, o = [];
+    if (n) o.push(`Next big release: ${n.name} on ${n.date} at ${n.time} (${n.days} days away).`);
+    const rel = (d.releases || []).filter(r => r.actual != null); o.push(rel.length ? `${rel.length} releases have a recorded actual number below.` : "Actual numbers appear here as releases come out."); return o; },
+  "Economic calendar": d => { const c = d.calendar, o = []; if (!c) return o;
+    if (c.next_tier1) o.push(`Next Tier 1 event: ${c.next_tier1.name} on ${c.next_tier1.date}, ${c.next_tier1.days} days away.`);
+    if (c.blackout) o.push(c.blackout.active ? `Fed blackout is on until ${c.blackout.end}. Fed speakers are quiet, so data and headlines drive price.` : `No Fed blackout now. The next FOMC is ${c.blackout.meeting}.`); return o; },
+  "Snapshot": d => { const o = [], f = d.four_market; if (f) o.push(f.text); if (d.posture) o.push(`Posture is ${d.posture.level}: ${d.posture.guidance}`); return o; },
+  "Before the open": d => { const t = d.triggers || [], hit = t.filter(x => x.status !== "ok"), near = t.filter(x => x.status === "ok" && x.near), o = [];
+    o.push(hit.length ? `${hit.length} trigger(s) are active: ${hit.map(x => x.label).join("; ")}.` : "No trigger is active.");
+    if (near.length) o.push(`Close to firing: ${near.map(x => x.label).join("; ")}.`);
+    if (d.four_market) o.push(`Other markets: ${d.four_market.text}`); return o; },
+  "Your instruments": d => (d.instruments || []).map(i => `${i.id}: ${i.tilt_label} backdrop. ${sgn(i.d1_pct)}% today, ${sgn(i.d5_pct)}% over 5 days.${i.warn ? " " + i.warn : ""}`),
+  "Posture": d => d.posture ? [`${d.posture.level}. ${d.posture.guidance}`] : [],
+};
+function sumBlock(t) {
+  const d = window.__d, f = SUMM[t]; if (!d || !f) return "";
+  let a = []; try { a = f(d).filter(Boolean); } catch (e) { return ""; }
+  if (!a.length) return "";
+  return `<div class="now"><b class="t">What this shows right now</b><ul>${a.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`;
+}
+function secHead(title, sub) { return `<div class="sec-head"><h2>${esc(title)}</h2></div><p class="sec-sub">${esc(sub)}</p>${sumBlock(title)}${howBlock(title)}`; }
 
 function renderPosture(d) {
   const p = d.posture, lv = p.level;
