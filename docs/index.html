@@ -205,7 +205,10 @@ footer summary { cursor: pointer; }
 @media (max-width: 600px) { .how dl { grid-template-columns: 1fr; gap: 0; } .how dd { margin-bottom: 8px; } }
 .fcin { width: 76px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--card, transparent); color: inherit; font: inherit; font-variant-numeric: tabular-nums; }
 table.rel td, table.rel th { vertical-align: top; text-align: left; } table.rel td .ic { vertical-align: -2px; }
-@media (max-width: 900px) { .g4 { grid-template-columns: 1fr 1fr; } .ev { grid-template-columns: 76px 1fr; } .ev .lt, .ev .ntag { grid-column: 2; } .ladder { grid-template-columns: 1fr 1fr; } }
+.stage { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 10px 0; }
+.stage div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 6px; font-size: 12.5px; text-align: center; background: var(--wash); opacity: .55; }
+.stage div.on { opacity: 1; background: var(--surf); border-color: var(--ink); }
+@media (max-width: 900px) { .g4 { grid-template-columns: 1fr 1fr; } .ev { grid-template-columns: 76px 1fr; } .ev .lt, .ev .ntag { grid-column: 2; } .ladder { grid-template-columns: 1fr 1fr; } .stage { grid-template-columns: 1fr 1fr; } }
 
 @media (max-width: 900px) {
   .hero, .g2, .g3 { grid-template-columns: 1fr; }
@@ -418,6 +421,13 @@ const HOW = {
     "The expected numbers fill in by themselves from a free calendar feed. After the release, read the surprise first, then the revision. Compare the print with what was expected, not with last month. Read core before headline. In a hiking cycle a print can own the whole session. On CPI days implied volatility builds into the print and collapses after. A rate cycle tells you which events matter this month.",
     "A release creates a burst of movement but not a direction. Payrolls are revised heavily, so check last month's revision. The expected numbers come from an unofficial free feed, not an official source, so double-check the big ones.",
     "The guide covers the surprise logic and key days. The scoreboard, the Tier ranking and the Fed quiet period are our additions."],
+  "Story": [
+    "Once a week to set the story, then a glance each morning. Use it before every big release.",
+    "The story the market is trading, how far along it is (birth, acceptance, crowding, exhaustion, shift), and how the next number fits it.",
+    "The same number moves the market opposite ways under different stories. A strong jobs report is good news in a soft-landing story and bad news in a higher-for-longer story. The market reacts to the surprise against what was expected, not to the number.",
+    "Read the story first, then the stage. Early in a story the trend is clean. Late in a story, when everyone agrees, the risk is high even if the timing is unknown. Before a release, write the consensus, what hot and cool would mean for the story, and which side is crowded. Then trade what the 2-year yield and the open do with the number.",
+    "Do not invent your own story and trade it. Do not treat every headline as a new story, because most data only confirms or dents the current one. The dashboard's story and stage are estimates from data, and you make the final call.",
+    "The idea comes from the Phase 04 lessons on the market narrative and on surprises. The scoring rules are our own, and the headline box is typed by you."],
   "Pre-market bias builder": [
     "Every morning, after reading the Today page.",
     "It stacks the four layers (monthly, weekly, nightly, 9 AM), then adds the options map you type in.",
@@ -872,7 +882,7 @@ function analyze(d, id) {
     : ["Everything is stressed.", "This is when big moves happen. Size down and follow confirmed direction."];
   const pl = d.posture.level, stressed = pl !== "Normal" || slowS, gm = M.gamma || "";
   const call = M.call, put = M.put, flip = M.flip, rng = call && put ? ` between ${put} and ${call}` : "";
-  const backdrop = `${pl} posture. Regime ${g ? g.label + " and " + g.direction : "unknown"}, credit ${c ? c.band.toLowerCase() : "unknown"}, VIX curve in ${v ? v.state : "unknown"}. Macro tilt for ${inst.id} is ${(inst.tilt_label || "neutral").toLowerCase()}.`;
+  const backdrop = `${(ST.sentence || "").trim() ? "Story: " + ST.sentence.trim().replace(/\.$/, "") + ". " : ""}${pl} posture. Regime ${g ? g.label + " and " + g.direction : "unknown"}, credit ${c ? c.band.toLowerCase() : "unknown"}, VIX curve in ${v ? v.state : "unknown"}. Macro tilt for ${inst.id} is ${(inst.tilt_label || "neutral").toLowerCase()}.`;
   const expect = pl === "Critical" ? "a stressed tape. I size down hard and only follow confirmed direction."
     : gm === "neg" && stressed ? "trend days and air pockets, because macro stress is meeting negative gamma. I follow confirmed breaks and cut size."
     : gm === "neg" ? "moves that can extend. I stay nimble and follow confirmed direction."
@@ -1059,14 +1069,210 @@ function viewHistory(d) {
       <div class="scroll"><table><tr><th>Date</th><th>Posture</th><th>Regime</th><th>VIX</th><th>HY (bp)</th><th>10Y</th></tr>${h.slice(-15).reverse().map(x => `<tr><td>${esc(x.date)}</td><td>${esc(x.posture)}</td><td>${esc(x.regime_avg)}</td><td>${nf(+x.vix, 1)}</td><td>${nf(+x.hy_bp, 0)}</td><td>${nf(+x.us10y, 2)}</td></tr>`).join("")}</table></div></div>`;
 }
 
+/* ---------- story page ---------- */
+const SKEY = "mc-story-v1";
+const ST = Object.assign({ sentence: "", headline: "", log: [] }, (() => { try { return JSON.parse(localStorage.getItem(SKEY)) || {}; } catch (e) { return {}; } })());
+const stSave = () => { try { localStorage.setItem(SKEY, JSON.stringify(ST)); } catch (e) { /* ignore */ } };
+const fin = v => typeof v === "number" && isFinite(v);
+
+const STAGES = [
+  ["Birth", "A few data points start pointing a new way. Most people ignore it, and price moves before the headlines catch up.", "Early and quiet. Clean trends start here, but conviction is low."],
+  ["Acceptance", "The data keeps confirming. The move gets cleaner and trends.", "The best part of a story. Follow the trend and trust your levels."],
+  ["Crowding", "Everyone agrees and positioning is one-sided. Moves get smaller for the same good news.", "The risk is high and the timing is unknown. Do not chase, and expect violent unwinds."],
+  ["Exhaustion", "Confirming news stops moving price. The thing everyone wanted happens and the market barely reacts.", "Do not add. Watch for the shift."],
+  ["Shift", "A new story takes over, and everyone positioned for the old one exits at once.", "Violent. Act only on confirmation: a catalyst, a broken level, and order flow."],
+];
+const RXL = [["hot", "CPI comes in hot"], ["cool", "CPI comes in cool"], ["strong", "Jobs come in strong"], ["weak", "Jobs come in weak"], ["hawk", "The Fed sounds hawkish"], ["dove", "The Fed sounds dovish"]];
+const STORIES = {
+  soft: { title: "Soft landing: the Fed can cut", sentence: "Inflation is easing, jobs are holding, and the Fed can keep cutting.",
+    why: "Good news is good news. The economy is fine and cuts support valuations, so dips get bought.",
+    rx: { hot: "Dents the story. Yields rise and NQ sells, and it hurts more if everyone is long.", cool: "Confirms it, but the gain is smaller because cuts are already priced.", strong: "Good news. The economy is fine, so NQ rallies.", weak: "Fine if it is mild. A big miss turns this into a growth scare.", hawk: "Hurts. The story needs cuts, so NQ sells more than ES.", dove: "Confirms, but mostly priced already. Expect a small move." } },
+  higher: { title: "Higher for longer: sticky inflation", sentence: "Inflation is sticky, so the Fed stays tight and yields stay high.",
+    why: "Good news is bad news. Strong data keeps the Fed tight, yields rise, and growth stocks pay for it.",
+    rx: { hot: "Confirms the story. Yields jump and NQ drops more than ES.", cool: "Relief, and possibly the first sign of a new story. Watch whether it holds through the open.", strong: "Bad news. A hot labor market keeps the Fed tight, so yields rise and NQ sells.", weak: "Relief rally, because it gives the Fed room to ease.", hawk: "Confirms it. NQ underperforms ES.", dove: "Breaks the story. A big move, in the other direction, for anyone positioned for higher rates." } },
+  growth: { title: "Growth scare: the economy is cracking", sentence: "The economy is weakening, so bad news is bad news and the Fed is behind.",
+    why: "Weak data hurts. Money moves toward bonds and defensives, and cyclicals lag.",
+    rx: { hot: "Awkward. It blocks the cuts the market wants, so stocks sell.", cool: "Helpful, because it lets the Fed respond to weak growth.", strong: "Relief. It eases the fear, so cyclicals and NQ bounce.", weak: "Bad news is bad news. Stocks fall and bonds rally.", hawk: "Policy-mistake fear. Stocks sell.", dove: "Helps only if growth fears are easing. Otherwise the market reads it as a worse backdrop." } },
+  risk: { title: "Risk-off: stress is spreading", sentence: "Stress is spreading across credit, volatility and the dollar, and the market is protecting itself.",
+    why: "Everything is read through fear. Correlations rise, good news fades fast, and bad news hits hard.",
+    rx: { hot: "Hits hard. Selling extends and dip-buying fails.", cool: "A bounce that often fades. Do not trust the first move.", strong: "Fades quickly. Stress is in charge, not the data.", weak: "Hits hard. It confirms the fear.", hawk: "Adds to the stress. Expect wide ranges.", dove: "A short relief rally. Wait for credit and the VIX curve to confirm." } },
+  oil: { title: "Oil shock: energy is driving inflation fears", sentence: "Oil is driving inflation fears and lifting the headline numbers.",
+    why: "Energy leads while consumers and growth stocks lag. Watch core, because the Fed looks through energy.",
+    rx: { hot: "Check core first. If only the headline is hot because of energy, the first spike usually fades.", cool: "Relief, if core cooled too. Otherwise the market looks through it.", strong: "Mixed. It adds to the rate worry while oil already squeezes consumers.", weak: "Raises growth fear. Oil and stocks can fall together.", hawk: "Hurts growth stocks. Energy holds up better.", dove: "Helps, but oil limits how far the Fed can go." } },
+  liquidity: { title: "Liquidity is the driver", sentence: "Money in the system is driving the market, more than the data.",
+    why: "The tide matters more than any single release. Improving liquidity lifts risk assets, tightening drains them.",
+    rx: { hot: "Matters less than liquidity. Watch whether funding conditions change.", cool: "Helps at the margin. Liquidity is still the main driver.", strong: "Little reaction unless it changes liquidity or Fed policy.", weak: "Little reaction unless it changes liquidity or Fed policy.", hawk: "Matters if it means a faster drain of the balance sheet.", dove: "Matters if it means more liquidity." } },
+};
+
+function stCtx(d) {
+  const r = d.rates || {}, cv = m => (r.curve || []).find(x => x.m === m) || {}, inf = d.inflation || {}, tile = id => (inf.tiles || []).find(t => t.id === id) || {},
+    cor = id => ((d.correlations || {}).rows || []).find(k => k.id === id) || {};
+  const y10 = cv("10Y");
+  return { phase: (r.cycle || {}).phase, y10mo: fin(y10.now) && fin(y10.mo) ? (y10.now - y10.mo) * 100 : null, priced: (r.priced_cuts || {}).value, realy: (r.real || {}).real, realmo: (r.real || {}).real_mo_bp,
+    s3m10: (r.spreads || {}).s3m10y, move: r.move || "", stress: (r.fed || {}).stress, core: tile("core_cpi"), cpi: tile("cpi"), pce: tile("core_pce"), infState: inf.state, lab: (d.labor || {}).state, liq: d.liquidity || {},
+    reg: d.regime || {}, c: d.credit || {}, v: d.vol || {}, e: d.energy || {}, x: d.dollar || {}, post: d.posture.level, breaks: (d.correlations || {}).breaks || 0, nqy: cor("nq_y10").now, stb: cor("spx_tlt").now, spo: cor("spx_oil").now,
+    leaders: (d.rotation || {}).leaders || [] };
+}
+function stScore(d) {
+  const X = stCtx(d), dims = (X.reg.dims || {}), low = k => dims[k] && dims[k].now < 45;
+  const L = {
+    soft: [["The Fed is in a cutting cycle", 3, X.phase === "CUTTING"], ["Inflation is steady or cooling", 2, X.infState === "steady" || X.infState === "cool"], ["The labor market is healthy", 2, X.lab === "healthy"],
+      ["Credit is calm", 2, (X.c.band_idx != null) && X.c.band_idx <= 1], ["The VIX curve is in contango and the VIX is below 20", 2, X.v.state === "contango" && X.v.vix < 20], ["The regime is risk-on", 2, X.reg.label === "risk-on"], ["The market prices at least one cut", 1, fin(X.priced) && X.priced >= 1]],
+    higher: [["Inflation is hot, or the core pace is rising", 3, X.infState === "hot" || X.core.trend === "rising" || X.pce.trend === "rising"], ["The Fed is hiking or at the peak", 2, X.phase === "HIKING" || X.phase === "PEAK"], ["Few cuts are priced", 2, fin(X.priced) && X.priced < 1],
+      ["Real yields are high or rising", 2, (fin(X.realy) && X.realy >= 2) || (fin(X.realmo) && X.realmo >= 10)], ["The 10-year is up 15 bp or more this month", 2, fin(X.y10mo) && X.y10mo >= 15], ["Stocks fall when yields rise", 2, fin(X.nqy) && X.nqy <= -0.25], ["The labor market is healthy", 1, X.lab === "healthy"]],
+    growth: [["Labor is softening or cracking", 3, X.lab === "softening" || X.lab === "cracking"], ["The curve is bull steepening", 2, /bull/i.test(X.move) && /steep/i.test(X.move)], ["The 10-year minus 3-month spread is negative", 1, X.s3m10 && X.s3m10.bp < 0],
+      ["Credit is widening", 2, (X.c.mo_bp >= 25) || (X.c.band_idx >= 2)], ["Oil fell 4% or more in 5 days", 1, X.e.d5_pct <= -4], ["Growth or jobs scores are weak", 2, low("growth") || low("employment")]],
+    risk: [["The posture is Elevated or Critical", 3, X.post !== "Normal"], ["The VIX curve is in backwardation", 3, X.v.state === "backwardation"], ["Credit is in the concern band or worse", 2, X.c.band_idx >= 2],
+      ["Two or more correlations have broken", 2, X.breaks >= 2], ["The dollar is strong", 1, X.x.above_108 || X.x.d5_pct >= 1], ["The regime is risk-off", 2, X.reg.label === "risk-off"]],
+    oil: [["Oil is in a supply-shock zone", 4, X.e.scenario === "supply_shock"], ["Oil is up 6% or more in 5 days", 2, X.e.d5_pct >= 6], ["Headline CPI is running above core", 2, fin(X.cpi.yoy) && fin(X.core.yoy) && X.cpi.yoy > X.core.yoy + 0.2],
+      ["Stocks fall when oil rises", 1, fin(X.spo) && X.spo <= -0.25], ["Energy is leading the sectors", 2, X.leaders.indexOf("Energy") >= 0]],
+    liquidity: [["Liquidity is improving or tightening, not flat", 3, X.liq.direction && X.liq.direction !== "flat"], ["The 13-week change is $150 billion or more", 2, fin(X.liq.chg13_bn) && Math.abs(X.liq.chg13_bn) >= 150], ["Funding markets show stress", 2, !!X.stress]],
+  };
+  const out = Object.keys(L).map(id => {
+    const tot = L[id].reduce((n, e) => n + e[1], 0), got = L[id].reduce((n, e) => n + (e[2] ? e[1] : 0), 0);
+    return { id, score: Math.round(got / tot * 100), ev: L[id].map(e => ({ t: e[0], met: !!e[2] })) };
+  }).sort((a, b) => b.score - a.score);
+  const t = out[0], u = out[1];
+  const kind = t.score >= 55 && t.score - u.score >= 12 ? "clear" : t.score >= 40 ? "mixed" : "none";
+  return { list: out, top: t, next: u, kind, X };
+}
+function stTitle(id, X) { return id === "liquidity" ? (X.liq.direction === "improving" ? "Liquidity tailwind: money is flowing in" : X.liq.direction === "tightening" ? "Liquidity drain: money is flowing out" : STORIES.liquidity.title) : STORIES[id].title; }
+
+function stStage(d, S) {
+  const X = S.X, i = (d.instruments.find(q => q.id === BS.inst) || d.instruments[0]).id, pos = d.positioning && d.positioning[i];
+  const A = analyze(d, i), lad = ladder(A, d), K = BS.chk || {};
+  const crowd = [], exh = [];
+  if (pos && fin(pos.lev_index) && (pos.lev_index >= 80 || pos.lev_index <= 20)) crowd.push(`${i} positioning is one-sided (index ${nf(pos.lev_index, 0)})`);
+  if (X.c.band_idx === 0) crowd.push("Credit spreads are in the euphoria band");
+  if (d.vol && d.vol.cone && d.vol.cone.pct <= 15) crowd.push("Protection is cheap against its own history");
+  if (X.v.vix < 14 && X.v.state === "contango") crowd.push("The VIX is very low");
+  if (X.reg.avg >= 75) crowd.push("The regime score is very strong");
+  if (K.goodnews) exh.push("You ticked that good news is not lifting the market");
+  if (lad.w.some(w => w[0] === "price")) exh.push("Price stopped agreeing with the macro story");
+  if (d.rotation && d.rotation.verdict === "disagrees") exh.push("Sector leadership disagrees with the macro story");
+  let n = 0;
+  if (lad.lvl >= 2) n = 4; else if (crowd.length >= 2 && exh.length >= 1) n = 3; else if (crowd.length >= 2) n = 2; else if (S.top.score >= 60 && X.reg.direction !== "deteriorating") n = 1;
+  return { n, crowd, exh, lad };
+}
+
+function stTest(d, X) {
+  const q = [];
+  if (fin(X.nqy)) q.push(X.nqy <= -0.25 ? ["watch", `Nasdaq and yields move opposite (${sg(X.nqy, 2)}). When yields rise, NQ falls. The market is worried about the Fed, not the economy, so good news is bad news.`]
+    : X.nqy >= 0.25 ? ["ok", `Nasdaq and yields move together (${sg(X.nqy, 2)}). The market is worried about growth, so good news is good news.`]
+    : ["neutral", `Nasdaq and yields have no clear link (${sg(X.nqy, 2)}). Rates are not the driver right now.`]);
+  if (fin(X.stb)) q.push(X.stb >= 0.3 ? ["alert", `Stocks and bonds move together (${sg(X.stb, 2)}). Inflation, not growth, is the worry, and bonds stop hedging stocks.`]
+    : X.stb <= -0.3 ? ["ok", `Stocks and bonds move opposite (${sg(X.stb, 2)}). That is the normal pattern, and bonds still hedge stocks.`]
+    : ["neutral", `Stocks and bonds are loosely linked (${sg(X.stb, 2)}).`]);
+  if (X.breaks >= 2) q.push(["alert", `${X.breaks} correlations have broken. Strategies that relied on the old relationships stop working.`]);
+  return q;
+}
+
+function stThree(d) {
+  const today = etToday(), g = d.regime, c = d.credit, v = d.vol, A = [];
+  A.push(["Is the environment calm or stressed?", d.posture.level === "Normal" ? "ok" : d.posture.level === "Elevated" ? "watch" : "crisis", `${d.posture.level} posture. ${d.posture.reasons[0] || ""}`]);
+  const worse = (g && g.direction === "deteriorating") || (c && c.mo_bp >= 25) || (v && v.d5 >= 2), better = (g && g.direction === "improving") || (c && c.mo_bp <= -25);
+  A.push(["Is it getting better or worse?", worse ? "watch" : better ? "ok" : "neutral", worse ? "Getting worse. The regime, credit or the VIX has turned the wrong way." : better ? "Getting better. The regime or credit is improving." : "No clear change this week."]);
+  const evs = d.calendar ? d.calendar.events.filter(e => e.tier <= 2 && e.date >= today).sort((a, b) => a.date.localeCompare(b.date)) : [], e0 = evs[0];
+  A.push(["Is there an event today that can change it?", e0 && e0.date === today ? "alert" : e0 && dayDiff(e0.date, today) <= 2 ? "watch" : "ok", !e0 ? "Nothing scheduled." : e0.date === today ? `Yes. ${e0.name}${e0.time ? " at " + e0.time + " ET" : ""}.` : `Not today. Next is ${e0.name} on ${fmtDay(e0.date)}.`]);
+  return A;
+}
+
+function stRxRow(ev, id) { // which story row an event maps to
+  const n = ev.name;
+  if (/CPI|PCE|PPI/i.test(n)) return ["hot", "cool", "Hot", "Cool"];
+  if (/Jobs|NFP|payroll/i.test(n)) return ["strong", "weak", "Strong", "Weak"];
+  if (/FOMC (decision|minutes)/i.test(n)) return ["hawk", "dove", "Hawkish", "Dovish"];
+  return null;
+}
+function stPrep(d, S, pos) {
+  const today = etToday(), evs = (d.calendar ? d.calendar.events : []).filter(e => e.tier === 1 && e.date >= today).slice(0, 3), R = d.releases || [], st = STORIES[S.top.id];
+  const ids = { CPI: ["cpi_yoy", "core_cpi_mom"], "Jobs report (NFP)": ["nfp", "unrate"], PPI: ["ppi_mom"], "Retail sales": ["retail_mom"], "PCE inflation": ["core_pce_mom"] };
+  const crowded = pos && fin(pos.lev_index) ? (pos.lev_index >= 70 ? "Longs are crowded, so a hot or hawkish surprise hurts more." : pos.lev_index <= 30 ? "Shorts are crowded, so a cool or dovish surprise squeezes harder." : "Positioning is not extreme, so neither side is clearly trapped.") : "Positioning data is not available.";
+  if (!evs.length) return `<p class="muted small">No Tier 1 release is in the calendar window.</p>`;
+  return evs.map(e => {
+    const m = stRxRow(e), cons = (ids[e.name] || []).map(id => R.find(r => r.id === id && r.next_date === e.date && r.next_expected != null)).filter(Boolean);
+    return `<div class="layer"><div class="cardhead" style="margin-bottom:4px"><h3 style="font-size:14px">${esc(e.name)}</h3><span class="muted small">${fmtDay(e.date)}${e.time ? ", " + esc(e.time) + " ET, " + esc(etLocal(e.date, e.time)) + " your time" : ""}</span></div>
+      <div class="rows"><div class="row" style="padding:5px 0">${ICON.neutral}<div class="small"><b>Consensus.</b> ${/FOMC/i.test(e.name) ? "A rate decision is usually priced in, so the statement, the dots and the press conference carry the surprise." : cons.length ? cons.map(r => `${esc(r.label)} ${uStr(r.next_expected, r)}`).join(", ") + ". Check how wide the range of forecasts is." : "The number appears in the Calendar scoreboard in release week. Check how wide the range of forecasts is."}</div><span></span></div>
+      <div class="row" style="padding:5px 0">${ICON.neutral}<div class="small"><b>Under this story.</b> ${m ? `<b>${m[2]}:</b> ${esc(st.rx[m[0]])}<br><b>${m[3]}:</b> ${esc(st.rx[m[1]])}` : "Read the number against the story, not by itself."}</div><span></span></div>
+      <div class="row" style="padding:5px 0">${ICON.neutral}<div class="small"><b>Crowded side.</b> ${esc(crowded)}</div><span></span></div></div></div>`;
+  }).join("") + `<details class="tbl"><summary>After the release: what usually happens</summary><div class="small" style="padding-top:8px">
+    <p><b>First seconds.</b> Algorithms read the headline against the consensus. Liquidity gets pulled and you get the spike.</p>
+    <p><b>First few minutes.</b> People read the details: core versus headline, the sub-parts, and the revisions. The move extends or fades. A beat with big downward revisions can be a weak report.</p>
+    <p><b>First half hour.</b> Bonds decide what it means for the Fed. Watch the 2-year yield, which is the cleanest read.</p>
+    <p><b>Rest of the day.</b> A move that survives the open is usually the real one. The first spike is often too big, and part of it gets given back.</p>
+    <p class="muted">Do not trade the number. Trade what the 2-year and the open do with it. If core was in line and only the headline was hot, the surprise is probably fake.</p></div></details>`;
+}
+
+function viewStory(d) {
+  if (!d.instruments.length) return `<div class="card"><p>Add at least one instrument in config.json.</p></div>`;
+  if (!BS.inst || !d.instruments.some(i => i.id === BS.inst)) BS.inst = d.instruments[0].id;
+  const S = stScore(d), top = S.top, X = S.X, sg1 = STORIES[top.id], title = stTitle(top.id, X), stage = stStage(d, S), q3 = stThree(d), test = stTest(d, X);
+  const pos = d.positioning && d.positioning[BS.inst], next = S.next;
+  const conf = S.kind === "clear" ? ["ok", "Clear story"] : S.kind === "mixed" ? ["watch", "Two stories compete"] : ["neutral", "No clear story"];
+  const evHtml = (s) => `<div class="rows">${s.ev.map(e => `<div class="row" style="padding:5px 0">${e.met ? ICON.support : ICON.neutral}<div class="small ${e.met ? "" : "muted"}">${esc(e.t)}${e.met ? "" : ", not seen"}</div><span></span></div>`).join("")}</div>`;
+  const sentence = ST.sentence || sg1.sentence;
+  const rxRows = RXL.map(([k, lab]) => `<tr><td style="text-align:left"><b>${esc(lab)}</b></td><td style="text-align:left">${esc(sg1.rx[k])}</td>${S.kind !== "clear" ? `<td style="text-align:left" class="muted">${esc(STORIES[next.id].rx[k])}</td>` : ""}</tr>`).join("");
+  const log = ST.log.slice().reverse();
+  POST.push(() => wireStory(d, S, stage));
+  return `${secHead("Story", "The market trades one story at a time, and every data point is read through it. Find the story first, then ask how the next number fits.")}
+    <div class="card" style="margin-bottom:14px"><div class="cardhead"><h3>Three questions for today</h3><span class="muted small">${etToday()}</span></div><div class="rows">${q3.map(q => `<div class="row" style="padding:7px 0">${ICON[q[1]]}<div class="small"><b>${esc(q[0])}</b><br>${esc(q[2])}</div><span></span></div>`).join("")}</div></div>
+    <div class="card" style="margin-bottom:14px"><div class="cardhead"><h3>The story right now</h3><span class="chip">${ICON[conf[0]]} ${esc(conf[1])}</span></div>
+      <p style="font-size:20px;font-weight:650;margin:2px 0 6px">${esc(title)}</p>
+      <p style="margin-bottom:6px">${esc(sg1.why)}</p>
+      <p class="muted small" style="margin-bottom:12px">Match score ${top.score} of 100.${S.kind !== "clear" ? ` Runner-up: ${esc(stTitle(next.id, X))} (${next.score}). When two stories compete, read the table below for both.` : ""}</p>
+      <div class="grid g2" style="align-items:start"><div><h3 style="font-size:14px;margin-bottom:4px">What supports it</h3>${evHtml(top)}</div>${S.kind !== "clear" ? `<div><h3 style="font-size:14px;margin-bottom:4px">Runner-up: ${esc(stTitle(next.id, X))}</h3>${evHtml(next)}</div>` : `<div class="warn">Do not invent your own story and trade it. Trade the story the market is using, even if you think it is wrong. A crowded story can stay crowded for weeks.</div>`}</div>
+      <div class="fields" style="margin-top:14px;grid-template-columns:1fr"><label class="field">What do the headlines keep repeating this week?<input type="text" id="st-head" value="${esc(ST.headline)}" placeholder="For example: rate cuts, tariffs, sticky inflation"></label>
+      <label class="field">My story in one sentence. If you cannot say it in one sentence, you do not know it yet.<input type="text" id="st-sent" value="${esc(sentence)}"></label></div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="st-use">Use the suggestion</button><button class="btn pri" id="st-save">Save this week's story</button></div></div>
+    <div class="grid g2" style="align-items:start;margin-bottom:14px">
+      <div class="card"><div class="cardhead"><h3>Where is the story in its life?</h3><span class="muted small">Estimate, with the evidence</span></div>
+        <div class="stage">${STAGES.map((s, k) => `<div class="${k === stage.n ? "on" : ""}"><b>${s[0]}</b></div>`).join("")}</div>
+        <p style="margin-bottom:4px"><b>${STAGES[stage.n][0]}.</b> ${esc(STAGES[stage.n][1])}</p><p class="small" style="margin-bottom:10px"><b>What to do:</b> ${esc(STAGES[stage.n][2])}</p>
+        ${stage.crowd.length ? `<p class="small"><b>Signs of crowding</b></p><div class="rows">${stage.crowd.map(t => `<div class="row" style="padding:4px 0">${ICON.watch}<div class="small">${esc(t)}</div><span></span></div>`).join("")}</div>` : `<p class="muted small">No signs of crowding.</p>`}
+        ${stage.exh.length ? `<p class="small" style="margin-top:8px"><b>Signs of exhaustion</b></p><div class="rows">${stage.exh.map(t => `<div class="row" style="padding:4px 0">${ICON.watch}<div class="small">${esc(t)}</div><span></span></div>`).join("")}</div>` : ""}
+        <p class="muted small" style="margin-top:10px">The easy money is early and the violent money is at the end. Crowding says the risk is high, not when it ends. For a Shift you need all three: a real catalyst, a broken level, and order flow confirming it. Tick those in the Bias builder.</p></div>
+      <div class="card"><div class="cardhead"><h3>How the market is reading the news</h3><span class="muted small">Last 60 days</span></div>
+        ${test.length ? `<div class="rows">${test.map(t => `<div class="row" style="padding:7px 0">${ICON[t[0]]}<div class="small">${esc(t[1])}</div><span></span></div>`).join("")}</div>` : `<p class="muted small">Not enough price history yet.</p>`}
+        <p class="muted small" style="margin-top:10px">The lesson's test: which way do yields move on good news? If yields jump on strong data and stocks fall, the market is worried about the Fed.</p></div></div>
+    <div class="card" style="margin-bottom:14px"><div class="cardhead"><h3>How the story changes the reaction</h3><span class="muted small">Same number, different story</span></div>
+      <div class="scroll"><table class="rel"><tr><th style="text-align:left">If</th><th style="text-align:left">${esc(title)}</th>${S.kind !== "clear" ? `<th style="text-align:left">${esc(stTitle(next.id, X))}</th>` : ""}</tr>${rxRows}</table></div>
+      <p class="muted small" style="margin-top:8px">NQ is rate-sensitive and feels real yields first, so on a rates day expect NQ to move more than ES. Strong jobs can be good or bad news, and only the story tells you which.</p></div>
+    <div class="card" style="margin-bottom:14px"><div class="cardhead"><h3>Before the next big release</h3><span class="muted small">Your three lines, started for you</span></div>${stPrep(d, S, pos)}</div>
+    <div class="card"><div class="cardhead"><h3>Story log</h3><span class="muted small">${log.length} saved</span></div>
+      ${log.length ? `<div class="scroll"><table><tr><th>Week of</th><th style="text-align:left">Story</th><th>Stage</th><th style="text-align:left">Your sentence</th><th></th></tr>${log.slice(0, 20).map(e => `<tr><td>${esc(e.date)}</td><td style="text-align:left">${esc(e.story)}</td><td>${esc(e.stage)}</td><td style="text-align:left;max-width:420px">${esc(e.sentence)}${e.headline ? `<div class="muted small">Headlines: ${esc(e.headline)}</div>` : ""}</td><td><button class="btn" data-sdel="${esc(e.date)}">Remove</button></td></tr>`).join("")}</table></div>` : `<p class="muted small">Nothing saved yet. Save one story each week, and you can see when the story changed.</p>`}
+      <div style="margin-top:12px"><button class="btn" id="st-csv">Export story log (CSV)</button></div></div>`;
+}
+function wireStory(d, S, stage) {
+  const sent = $("#st-sent"), head = $("#st-head");
+  if (head) head.addEventListener("change", () => { ST.headline = head.value.trim(); stSave(); });
+  if (sent) sent.addEventListener("change", () => { ST.sentence = sent.value.trim(); stSave(); });
+  const use = $("#st-use"); if (use) use.addEventListener("click", () => { ST.sentence = STORIES[S.top.id].sentence; stSave(); render(d); });
+  const sv = $("#st-save"); if (sv) sv.addEventListener("click", () => {
+    const now = new Date(etToday() + "T00:00:00Z"), dow = (now.getUTCDay() + 6) % 7, wk = addDays(etToday(), -dow);
+    const e = { date: wk, story: stTitle(S.top.id, S.X), stage: STAGES[stage.n][0], sentence: (sent && sent.value.trim()) || STORIES[S.top.id].sentence, headline: (head && head.value.trim()) || "" };
+    ST.sentence = e.sentence; ST.headline = e.headline; ST.log = ST.log.filter(x => x.date !== wk); ST.log.push(e); ST.log = ST.log.slice(-104); stSave(); render(d);
+  });
+  document.querySelectorAll("[data-sdel]").forEach(b => b.addEventListener("click", () => { ST.log = ST.log.filter(x => x.date !== b.dataset.sdel); stSave(); render(d); }));
+  const csv = $("#st-csv"); if (csv) csv.addEventListener("click", () => {
+    const cols = ["date", "story", "stage", "sentence", "headline"], q = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+    download("story-log.csv", [cols.join(",")].concat(ST.log.map(e => cols.map(c => q(e[c])).join(","))).join("\n"), "text/csv");
+  });
+}
+function storyStrip(d) {
+  try {
+    const S = stScore(d), stage = stStage(d, S);
+    return `<a href="#story" class="card" style="display:block;text-decoration:none;color:inherit;margin:0 0 14px"><div class="small muted">The story right now</div><div style="font-size:17px;font-weight:650">${esc(stTitle(S.top.id, S.X))}</div><div class="small muted">${S.kind === "clear" ? "Clear story" : S.kind === "mixed" ? "Two stories compete" : "No clear story"}. Stage: ${esc(STAGES[stage.n][0])}. Open the Story page for the evidence.</div></a>`;
+  } catch (e) { return ""; }
+}
+
 /* ---------- page ---------- */
-const VIEWS = [["today", "Today"], ["weekly", "Weekly"], ["calendar", "Calendar"], ["bias", "Bias builder"], ["history", "History"]];
+const VIEWS = [["today", "Today"], ["story", "Story"], ["weekly", "Weekly"], ["calendar", "Calendar"], ["bias", "Bias builder"], ["history", "History"]];
 const curView = () => { const h = (location.hash || "").replace("#", ""); return VIEWS.some(v => v[0] === h) ? h : "today"; };
 
 function viewToday(d) {
   const m = d.meta;
   let html = calFlags(d) + `<div class="hero">${renderPosture(d)}${renderRegime(d)}</div>`;
-  html += tagCard(d);
+  html += storyStrip(d) + tagCard(d);
   html += `<section class="block" style="margin-top:20px">${secHead("Your instruments", "Which way the macro backdrop is leaning on each one. Add more in config.json.")}${renderInstruments(d)}</section>`;
   html += `<section class="block">${secHead("Before the open", "Read the triggers, then check whether the other markets agree with the move.")}<div class="grid g2">${renderTriggers(d)}${renderFour(d)}</div></section>`;
   html += `<section class="block">${secHead("Snapshot", "Read once before the open and note anything that moved sharply overnight. These change slowly, so do not watch them intraday.")}${renderTiles(d)}</section>`;
@@ -1101,7 +1307,7 @@ function render(d) {
     <button class="theme" id="theme" aria-label="Change colour theme">Theme</button></header>
     <nav class="nav" aria-label="Pages">${VIEWS.map(v => `<a href="#${v[0]}" ${v[0] === view ? 'aria-current="page"' : ""}>${v[1]}</a>`).join("")}</nav>`;
   if (m.mode === "demo") html += `<div class="banner"><b>Demo data.</b> Every number here is synthetic, so none of it is market data. The first scheduled run replaces it with live data.</div>`;
-  html += view === "weekly" ? viewWeekly(d) : view === "calendar" ? viewCalendar(d) : view === "bias" ? viewBias(d) : view === "history" ? viewHistory(d) : viewToday(d);
+  html += view === "story" ? viewStory(d) : view === "weekly" ? viewWeekly(d) : view === "calendar" ? viewCalendar(d) : view === "bias" ? viewBias(d) : view === "history" ? viewHistory(d) : viewToday(d);
   html += `<footer><p>Context, not entries. The regime tells you how much to trust your levels and how big to trade. Price and order flow tell you when to act.</p>
     <details><summary>Data notes${m.errors.length ? ` (${m.errors.length})` : ""}</summary><div style="padding-top:8px">
       <p>Sources: FRED for yields, credit, jobs, inflation, the Fed balance sheet and Treasury cash. Yahoo Finance for VIX, dollar, oil, sector funds and futures prices. CFTC for positioning. Expected numbers for releases from a free public calendar feed (unofficial). Fed funds futures are not free, so cuts priced is a proxy. Gamma levels are not free either, so you type them into the Bias builder. Some calendar dates (retail sales, PCE) are approximate. Check the official schedule.</p>
