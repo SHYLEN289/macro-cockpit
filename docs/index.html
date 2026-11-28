@@ -208,6 +208,20 @@ table.rel td, table.rel th { vertical-align: top; text-align: left; } table.rel 
 .stage { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 10px 0; }
 .stage div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 6px; font-size: 12.5px; text-align: center; background: var(--wash); opacity: .55; }
 .stage div.on { opacity: 1; background: var(--surf); border-color: var(--ink); }
+
+/* news */
+.nws { display: grid; gap: 12px; }
+.nitem { background: var(--surf); border: 1px solid var(--line); border-left: 4px solid var(--axis); border-radius: 10px; padding: 14px 16px; }
+.nitem.bullish { border-left-color: var(--good); } .nitem.bearish { border-left-color: var(--crit); } .nitem.mixed { border-left-color: var(--warn); }
+.nitem h4 { margin: 0 0 8px; font-size: 15.5px; }
+.nrow { display: grid; grid-template-columns: 118px 1fr; gap: 10px; font-size: 14px; padding: 4px 0; border-top: 1px solid var(--line); }
+.nrow:first-of-type { border-top: 0; }
+.nrow b { color: var(--ink2); font-weight: 600; font-size: 13px; }
+.nsrc { font-size: 12.5px; color: var(--ink2); margin-top: 6px; }
+.nsrc a { color: var(--ink2); }
+.big { font-size: 16px; line-height: 1.5; }
+.hl li { margin: 4px 0; font-size: 14px; }
+@media (max-width: 600px) { .nrow { grid-template-columns: 1fr; gap: 2px; } }
 @media (max-width: 900px) { .g4 { grid-template-columns: 1fr 1fr; } .ev { grid-template-columns: 76px 1fr; } .ev .lt, .ev .ntag { grid-column: 2; } .ladder { grid-template-columns: 1fr 1fr; } .stage { grid-template-columns: 1fr 1fr; } }
 
 @media (max-width: 900px) {
@@ -1266,7 +1280,37 @@ function storyStrip(d) {
 }
 
 /* ---------- page ---------- */
-const VIEWS = [["today", "Today"], ["story", "Story"], ["weekly", "Weekly"], ["calendar", "Calendar"], ["bias", "Bias builder"], ["history", "History"]];
+
+const HZ = { short: "Short-term: hours to days", long: "Long-term: weeks or more", both: "Short and long-term" };
+const TONE = { bullish: "Leans bullish", bearish: "Leans bearish", mixed: "Mixed", neutral: "Neutral" };
+function viewNews(d) {
+  const n = window.__news;
+  let h = `<section class="block"><div class="sec-head"><h2>News summary</h2></div>
+    <p class="sec-sub">Headlines from free public feeds, summarised by AI into what changed, what it means for NQ and ES, and how to approach it. The summary is an AI reading of headlines. It is context for your plan, not a signal. Updated by the bot with the data runs.</p>`;
+  if (!n) return h + `<div class="banner"><b>No news file yet.</b> Run the "Update macro data" workflow once (Actions tab, Run workflow). The news appears after it finishes.</div></section>`;
+  h += `<p class="sec-sub">Built ${esc(n.generated_at)}${n.model ? ` with ${esc(n.model)}` : ""}.${n.mode === "demo" ? " <b>Sample text only.</b>" : ""}</p>`;
+  if (n.mode === "headlines") h += `<div class="banner"><b>Headlines only.</b> No AI summary in this run. ${esc((n.errors || []).slice(0, 2).join(" "))}</div>`;
+  if (n.summary) {
+    h += `<div class="card big" style="margin-bottom:18px"><b>Big picture.</b> ${esc(n.summary.big_picture)}</div>`;
+    n.summary.sections.forEach(s => {
+      h += `<h3 style="margin:22px 0 10px">${esc(s.title)}</h3><div class="nws">`;
+      s.items.forEach(it => {
+        h += `<div class="nitem ${esc(it.tone)}"><h4>${esc(it.title)}</h4>
+          <div class="nrow"><b>What changed</b><span>${esc(it.what_changed)}</span></div>
+          <div class="nrow"><b>Effect on NQ / ES</b><span>${esc(it.nq_es)}</span></div>
+          <div class="nrow"><b>How to approach</b><span>${esc(it.approach)}</span></div>
+          <div class="nrow"><b>How long</b><span>${esc(HZ[it.horizon] || "")}. ${esc(TONE[it.tone] || "")}.</span></div>
+          ${it.links && it.links.length ? `<div class="nsrc">Read: ${it.links.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.source)}</a>`).join(", ")}</div>` : ""}</div>`;
+      });
+      h += `</div>`;
+    });
+  }
+  if (n.headlines && n.headlines.length) {
+    h += `<details style="margin-top:22px"${n.summary ? "" : " open"}><summary>All headlines the summary used</summary>${n.headlines.map(s => `<h4 style="margin:14px 0 4px">${esc(s.title)}</h4><ul class="hl">${s.headlines.map(x => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a> <span style="color:var(--ink2)">${esc(x.source)}</span></li>`).join("")}</ul>`).join("")}</details>`;
+  }
+  return h + `</section>`;
+}
+const VIEWS = [["today", "Today"], ["news", "News"], ["story", "Story"], ["weekly", "Weekly"], ["calendar", "Calendar"], ["bias", "Bias builder"], ["history", "History"]];
 const curView = () => { const h = (location.hash || "").replace("#", ""); return VIEWS.some(v => v[0] === h) ? h : "today"; };
 
 function viewToday(d) {
@@ -1307,7 +1351,7 @@ function render(d) {
     <button class="theme" id="theme" aria-label="Change colour theme">Theme</button></header>
     <nav class="nav" aria-label="Pages">${VIEWS.map(v => `<a href="#${v[0]}" ${v[0] === view ? 'aria-current="page"' : ""}>${v[1]}</a>`).join("")}</nav>`;
   if (m.mode === "demo") html += `<div class="banner"><b>Demo data.</b> Every number here is synthetic, so none of it is market data. The first scheduled run replaces it with live data.</div>`;
-  html += view === "story" ? viewStory(d) : view === "weekly" ? viewWeekly(d) : view === "calendar" ? viewCalendar(d) : view === "bias" ? viewBias(d) : view === "history" ? viewHistory(d) : viewToday(d);
+  html += view === "news" ? viewNews(d) : view === "story" ? viewStory(d) : view === "weekly" ? viewWeekly(d) : view === "calendar" ? viewCalendar(d) : view === "bias" ? viewBias(d) : view === "history" ? viewHistory(d) : viewToday(d);
   html += `<footer><p>Context, not entries. The regime tells you how much to trust your levels and how big to trade. Price and order flow tell you when to act.</p>
     <details><summary>Data notes${m.errors.length ? ` (${m.errors.length})` : ""}</summary><div style="padding-top:8px">
       <p>Sources: FRED for yields, credit, jobs, inflation, the Fed balance sheet and Treasury cash. Yahoo Finance for VIX, dollar, oil, sector funds and futures prices. CFTC for positioning. Expected numbers for releases from a free public calendar feed (unofficial). Fed funds futures are not free, so cuts priced is a proxy. Gamma levels are not free either, so you type them into the Bias builder. Some calendar dates (retail sales, PCE) are approximate. Check the official schedule.</p>
@@ -1333,7 +1377,7 @@ function initTheme() {
 }
 
 fetch("data.json?" + Date.now()).then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-  .then(d => { window.__d = d; render(d); })
+  .then(d => fetch("news.json?" + Date.now()).then(r => r.ok ? r.json() : null).catch(() => null).then(n => { window.__news = n; window.__d = d; render(d); }))
   .catch(err => {
     $("#app").innerHTML = `<div class="banner err"><b>Could not load data.json.</b> ${esc(err.message)}. If you opened this file straight from your computer, browsers block it. Serve the folder instead (run <code>python3 -m http.server</code> inside docs) or open the GitHub Pages address.</div>`;
   });
