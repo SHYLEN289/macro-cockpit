@@ -22,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs" / "news.json"
 UA = {"User-Agent": "Mozilla/5.0 (macro-cockpit news bot)"}
-MODELS = ["gemini-3.6-flash", "gemini-3.8-flash", "gemini-flash-latest"]
+MODELS = ["gemini-3.6-flash", "gemini-3.8-flash", "gemini-flash-latest", "gemini-flash-lite-latest"]
 MAX_AGE_H = 40
 PER_SECTION = 14
 
@@ -34,28 +34,35 @@ def gnews(q):
 
 
 # section id -> (title, feeds[(label, url)])
+SITES = " (site:reuters.com OR site:cnbc.com OR site:bloomberg.com OR site:wsj.com OR site:marketwatch.com OR site:barrons.com OR site:ft.com OR site:apnews.com)"
+
+
+def gs(q):
+    return gnews("(" + q + ")" + SITES)
+
+
+# section id -> (title, feeds[(label, url)], must-contain keywords or None)
 SECTIONS = {
     "fed": ("Fed and rates", [
         ("Federal Reserve", "https://www.federalreserve.gov/feeds/press_all.xml"),
-        ("Google News", gnews("Federal Reserve OR FOMC OR Treasury yields OR rate cut")),
-    ]),
+        ("Google News", gs('"Federal Reserve" OR FOMC OR Powell OR "Treasury yields" OR "rate cut"')),
+    ], ["fed", "fomc", "powell", "yield", "treasury", "rate cut", "rate hike", "interest rate"]),
     "econ": ("Economy and data", [
         ("CNBC economy", "https://www.cnbc.com/id/20910258/device/rss/rss.html"),
-        ("Google News", gnews("US economy inflation OR jobs OR GDP OR retail sales OR PCE")),
-    ]),
+        ("Google News", gs('"US economy" OR CPI OR payrolls OR "jobless claims" OR GDP OR PCE OR "retail sales"')),
+    ], None),
     "mega": ("Index heavyweights", [
-        ("Google News", gnews("Nvidia OR Microsoft OR Apple OR Amazon stock")),
-        ("Google News", gnews("Alphabet OR Meta OR Tesla OR Broadcom stock")),
-        ("Yahoo Finance", "https://finance.yahoo.com/news/rssindex"),
-    ]),
+        ("Google News", gs("Nvidia OR Microsoft OR Apple OR Amazon")),
+        ("Google News", gs("Alphabet OR Google OR Meta OR Tesla OR Broadcom")),
+    ], ["nvidia", "microsoft", "apple", "amazon", "alphabet", "google", "meta ", "tesla", "broadcom", "nvda", "msft", "aapl", "amzn", "googl", "tsla", "avgo"]),
     "macro": ("Policy, geopolitics and oil", [
-        ("Google News", gnews("tariffs OR sanctions OR geopolitics markets")),
-        ("Google News", gnews("oil prices OPEC OR crude")),
-    ]),
+        ("Google News", gs("tariffs OR sanctions OR \"trade war\" OR Ukraine OR \"Middle East\"")),
+        ("Google News", gs('"oil prices" OR OPEC OR "crude oil"')),
+    ], None),
     "mkts": ("Market wrap", [
         ("CNBC markets", "https://www.cnbc.com/id/15839069/device/rss/rss.html"),
-        ("Google News", gnews("Wall Street stocks Nasdaq S&P 500 futures")),
-    ]),
+        ("Google News", gs('"Wall Street" OR Nasdaq OR "S&P 500" OR "stock futures"')),
+    ], None),
 }
 
 MEGA = ["NVDA", "MSFT", "AAPL", "AMZN", "GOOGL", "META", "TSLA", "AVGO"]
@@ -109,7 +116,7 @@ def parse_feed(raw, label):
 def collect(errors):
     now = dt.datetime.now(dt.timezone.utc)
     secs = {}
-    for sid, (title, feeds) in SECTIONS.items():
+    for sid, (title, feeds, must) in SECTIONS.items():
         seen, items = set(), []
         for label, url in feeds:
             try:
@@ -119,6 +126,8 @@ def collect(errors):
                 continue
             for g in got:
                 if g["ts"] is not None and (now - g["ts"]).total_seconds() > MAX_AGE_H * 3600:
+                    continue
+                if must and not any(k in g["title"].lower() for k in must):
                     continue
                 key = re.sub(r"\W+", "", g["title"].lower())[:60]
                 if key in seen:
@@ -168,24 +177,31 @@ def build_prompt(secs):
 
 
 def call_gemini(prompt, key, errors):
+    import time
     body = json.dumps({
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"responseMimeType": "application/json", "temperature": 0.3},
     }).encode()
     for model in MODELS:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-        req = urllib.request.Request(url, data=body, headers={
-            "Content-Type": "application/json", "x-goog-api-key": key})
-        try:
-            with urllib.request.urlopen(req, timeout=90) as r:
-                data = json.loads(r.read())
-            text = data["candidates"][0]["content"]["parts"][0]["text"]
-            text = re.sub(r"^```(?:json)?|```$", "", text.strip()).strip()
-            return json.loads(text), model
-        except urllib.error.HTTPError as e:
-            errors.append(f"Gemini {model}: HTTP {e.code} {e.read()[:140].decode('utf-8', 'ignore')}")
-        except Exception as e:
-            errors.append(f"Gemini {model}: {type(e).__name__} {str(e)[:100]}")
+        for attempt in range(3):
+            req = urllib.request.Request(url, data=body, headers={
+                "Content-Type": "application/json", "x-goog-api-key": key})
+            try:
+                with urllib.request.urlopen(req, timeout=90) as r:
+                    data = json.loads(r.read())
+                text = data["candidates"][0]["content"]["parts"][0]["text"]
+                text = re.sub(r"^```(?:json)?|```$", "", text.strip()).strip()
+                return json.loads(text), model
+            except urllib.error.HTTPError as e:
+                errors.append(f"Gemini {model} try {attempt + 1}: HTTP {e.code} {e.read()[:90].decode('utf-8', 'ignore')}")
+                if e.code in (429, 500, 502, 503, 504) and attempt < 2:
+                    time.sleep(20 * (attempt + 1))
+                    continue
+                break
+            except Exception as e:
+                errors.append(f"Gemini {model}: {type(e).__name__} {str(e)[:100]}")
+                break
     return None, None
 
 
